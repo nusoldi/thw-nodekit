@@ -159,10 +159,11 @@ The `Toolkit` provides various utilities for validator management and monitoring
 
 #### `tvc`: Live TVC Tracker
 
-Tracks vote credits in real-time for a specified validator.
+Tracks vote credits in real-time for a specified validator.  
 
+*Note 1: It is advised to not run this monitor on a live node given the heavy RPC calls required. We run it on our monitoring VPS with minimal specs (4 GB RAM / 2 vCPUs) and it runs great (alongside Grafana/Watchtower/etc).*
 
-*Note: The way `missed_credits` are calculated is against the Rank 1 validator in the cluster, rather than a hypothetical "optimal" validator (such as how vxtools measures it). We took this approach for simplicity as the difference between TVC ranks is primarily what we're looking to measure.*
+*Note 2: The way `missed_credits` are calculated is against the Rank 1 validator in the cluster, rather than a hypothetical "optimal" validator (such as how vxtools measures it). We took this approach for simplicity as the difference between TVC ranks is primarily what we're looking to measure.*
 
 *   **Arguments**:
     *   `cluster` (Required): Cluster to use.
@@ -240,7 +241,7 @@ Downloads full or incremental snapshots from the Avorio network. `aria2c` must b
         ```bash
         thw-nodekit snap-avorio ut both
         ```
-![image](https://github.com/user-attachments/assets/5aed4b76-b047-4456-a783-d166efa9a937)
+![image](https://github.com/user-attachments/assets/dc8ae844-9eaf-4e43-b0f6-c96809e12e8c)
 
 ---
 
