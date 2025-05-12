@@ -15,6 +15,9 @@ default_identity_ut = "THWn57216Xoen7wQ74j2RxcqUt3CMpaGaUvzo1kZdC1"  # Default v
 # RPC URLs for different Solana clusters
 [rpc_urls]
 
+# Recommend adding private RPCs for better performance. Free RPCs available from Helius, Quicknode, Allnodes, etc.
+# TVC Tracker will cycle thru available RPCs below when rate limits are hit
+
 # Mainnet RPC URLs
 [rpc_urls.um]
 description = "Mainnet URLs"

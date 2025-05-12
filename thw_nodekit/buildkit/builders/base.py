@@ -10,6 +10,13 @@ from thw_nodekit.buildkit.operations import git, filesystem, commands
 
 logger = logging.getLogger(__name__)
 
+# ANSI Color Codes
+COLOR_BOLD_GREEN = "\033[1;32m"
+COLOR_BRIGHT_CYAN = "\033[1;36m"
+COLOR_YELLOW = "\033[1;33m"
+COLOR_RED = "\033[1;31m"
+COLOR_RESET = "\033[0m"
+
 class BaseBuilder(abc.ABC):
     """Abstract Base Class for project builders."""
 
