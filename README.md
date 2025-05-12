@@ -3,7 +3,7 @@
 **THW-NodeKit** is a toolkit for Solana validator **operatoooooooooors**, created by Nu_Soldi ([@nusoldi](https://github.com/nusoldi), [@Nu_Soldi](https://x.com/Nu_Soldi)) on behalf of **THW Validator** ([trulyhonestwork.io](https://trulyhonestwork.io/), [@trulyhonestwork](https://x.com/trulyhonestwork)). *It ain't much, but it's Truly Honest Work™.*
 
 
-***Note from the creator***: *This project was created to simplify a bunch of random bash scripts and tools into a singular CLI for ease-of-use. The implementation is Python-based due to experience in the language. Significant assistance from Claude and Gemini were used. I am not a full-time dev by any stretch of the imagination. There is of course significant room for improvement and updates will be shipped frequently. However, as it stands, everything has worked for us without issue in our experience, so long as it's used as intended. It is being shared publically in the case it helps anyone else in the community. We welcome feedback/collaboration on future enhancements.*
+***Note from the creator***: *This project was originally created to simplify a bunch of random bash scripts and tools into a singular CLI for personal ease-of-use. The implementation is Python-based due to experience in the language. Significant assistance from Claude and Gemini were used. I am not a full-time dev by any stretch of the imagination. There is of course significant room for improvement and updates will be shipped frequently. There are surely edge cases not yet accounteded for and error handling could be better. However, as it stands, everything has worked for us without issue in its current form, so long as it's used as intended. It is being shared publically in the case it helps anyone else in the community. We welcome feedback/collaboration on future enhancements.*
 
 
 ## Core Components
@@ -147,6 +147,9 @@ For example: `~/.local/share/solana/install/releases/jito/v2.1.18-jito`
         ```bash
         thw-nodekit build firedancer official v0.401.20113 false
         ```
+![image](https://github.com/user-attachments/assets/68f0d25e-8fc0-4353-95bc-5c464f8022ec)
+
+---
 
 ## `Toolkit`: Usage
 
@@ -237,6 +240,7 @@ Downloads full or incremental snapshots from the Avorio network. `aria2c` must b
         ```bash
         thw-nodekit snap-avorio ut both
         ```
+![image](https://github.com/user-attachments/assets/5aed4b76-b047-4456-a783-d166efa9a937)
 
 ---
 
@@ -258,6 +262,7 @@ Finds and downloads the latest available snapshot by querying RPC nodes in gossi
         ```bash
         thw-nodekit snap-finder um
         ```
+![image](https://github.com/user-attachments/assets/a178d0d0-5687-46bd-bcb0-7721c54b8a0c)
 
 ---
 
@@ -282,6 +287,7 @@ Creates or updates the `active_release` symlink for a specified Solana client ve
         ```bash
         thw-nodekit symlink jito v2.1.18-jito
         ```
+![image](https://github.com/user-attachments/assets/04b90173-0146-43a0-803a-0a0076c92623)
 
 ---
 
