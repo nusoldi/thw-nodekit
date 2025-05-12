@@ -121,9 +121,9 @@ def manage_affinity(core_override: Optional[int] = None) -> None:
             print(f"{COLOR_BRIGHT_CYAN}{separator}{COLOR_RESET}")
 
             if os.geteuid() != 0:
-                logger.warning("Process not running as root. Setting CPU affinity might fail if the user does not have the necessary permissions.")
+                logger.warning("This command may require root (sudo) privileges to change CPU affinity.")
                 print(f"{COLOR_YELLOW}Warning: This command may require root (sudo) privileges to change CPU affinity.{COLOR_RESET}")
-                print() # Add a blank line for spacing before the prompt
+                print() # Blank line for spacing before the prompt
 
             try:
                 confirm = input(f"{COLOR_BOLD_GREEN}Proceed to set affinity to core {target_core}? (y/n): {COLOR_RESET}").strip().lower()

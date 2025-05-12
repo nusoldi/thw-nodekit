@@ -37,8 +37,8 @@ def format_time_remaining(time_remaining: Union[str, int, float, datetime.timede
     # Format with pluralization
     day_text = f"{days} day{'s' if days != 1 else ''}"
     hour_text = f"{hours} hour{'s' if hours != 1 else ''}"
-    minute_text = f"{minutes} minute{'s' if minutes != 1 else ''}"
-    second_text = f"{seconds} second{'s' if seconds != 1 else ''}"
+    minute_text = f"{minutes} min"
+    second_text = f"{seconds} sec"
 
     # Combine both formats
     return f"{day_text}, {hour_text}, {minute_text}, {second_text}"

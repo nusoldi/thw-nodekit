@@ -474,18 +474,24 @@ class TVCTrackerDisplay(BaseTrackerDisplay):
         # Ensure estimated end time is in UTC
         est_end_time_utc = ensure_utc(metrics['estimated_end_time'])
         
-        # Add UTC time
-        epoch_table.add_row(
-            Text("Estimated End (UTC):", style=STYLE_BRIGHT_CYAN), 
-            Text(format_timestamp(est_end_time_utc, format_type="both"))
-        )
+        # Add UTC time (ISO format)
+        utc_label = Text("Est. End Time (UTC):", style=STYLE_BRIGHT_CYAN)
+        utc_iso = Text(format_timestamp(est_end_time_utc, format_type="iso"))
+        epoch_table.add_row(utc_label, utc_iso)
+
+        # Add UTC time (Human-readable format)
+        utc_human = Text(format_timestamp(est_end_time_utc, format_type="human"))
+        epoch_table.add_row(utc_label, utc_human)
         
-        # Convert to EST and add EST time
+        # Convert to EST and add EST time (ISO format)
         est_end_time_est = convert_timezone(est_end_time_utc, "America/New_York")
-        epoch_table.add_row(
-            Text("Estimated End (EST):", style=STYLE_BRIGHT_CYAN), 
-            Text(format_timestamp(est_end_time_est, format_type="both"))
-        )
+        est_label = Text("Est. End Time (EST):", style=STYLE_BRIGHT_CYAN)
+        est_iso = Text(format_timestamp(est_end_time_est, format_type="iso"))
+        epoch_table.add_row(est_label, est_iso)
+
+        # Add EST time (Human-readable format)
+        est_human = Text(format_timestamp(est_end_time_est, format_type="human"))
+        epoch_table.add_row(est_label, est_human)
 
         epoch_table.add_row(Text("Time Remaining:", style=STYLE_BRIGHT_CYAN), format_time_remaining(metrics.get("time_remaining_seconds", metrics["time_remaining"])))
         # epoch_table.add_row(Text(" "))
@@ -549,18 +555,24 @@ class TVCTrackerDisplay(BaseTrackerDisplay):
                 # Ensure the time is in UTC
                 next_time_utc = ensure_utc(next_time)
                 
-                # Display UTC time
-                leader_table.add_row(
-                    Text("Next Leader Time (UTC):", style=STYLE_BRIGHT_CYAN), 
-                    Text(format_timestamp(next_time_utc, format_type="both"))
-                )
-                
-                # Convert to EST and display
+                # Display UTC time (ISO format)
+                utc_label = Text("Next Leader Time (UTC):", style=STYLE_BRIGHT_CYAN)
+                utc_iso = Text(format_timestamp(next_time_utc, format_type="iso"))
+                leader_table.add_row(utc_label, utc_iso)
+
+                # Display UTC time (Human-readable format)
+                utc_human = Text(format_timestamp(next_time_utc, format_type="human"))
+                leader_table.add_row(utc_label, utc_human)
+
+                # Convert to EST and display (ISO format)
                 next_time_est = convert_timezone(next_time_utc, "America/New_York")
-                leader_table.add_row(
-                    Text("Next Leader Time (EST):", style=STYLE_BRIGHT_CYAN), 
-                    Text(format_timestamp(next_time_est, format_type="both"))
-                )
+                est_label = Text("Next Leader Time (EST):", style=STYLE_BRIGHT_CYAN)
+                est_iso = Text(format_timestamp(next_time_est, format_type="iso"))
+                leader_table.add_row(est_label, est_iso)
+
+                # Display EST time (Human-readable format)
+                est_human = Text(format_timestamp(next_time_est, format_type="human"))
+                leader_table.add_row(est_label, est_human)
                 
                 # Add time remaining
                 time_remaining = leader_metrics.get('leader_slot_time_remaining')
