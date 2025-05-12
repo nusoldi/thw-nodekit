@@ -1,0 +1,79 @@
+# THW-NodeKit Configuration
+
+## **********TOOLKIT CONFIG***********
+
+[toolkit]
+poh_core = 2 # Default CPU core to set affinity for the Solana PoH thread.
+snapshot_dir_um = "/mnt/snapshots/mainnet" # Default snapshot directory for mainnet
+snapshot_dir_ut = "/mnt/snapshots/testnet" # Default snapshot directory for testnet
+ipinfo_token = "" # Add your IPinfo token here (get a free token from ipinfo.io) - not required but may help if rate limits hit
+
+# Default validator identities to use when none specified in command line
+default_identity_um = "THWsLPufeq9LWs2H9vYPbtFwdxAHbQHvSbT6pztG8x1"  # Default validator identity for mainnet
+default_identity_ut = "THWn57216Xoen7wQ74j2RxcqUt3CMpaGaUvzo1kZdC1"  # Default validator identity for testnet
+
+# RPC URLs for different Solana clusters
+[rpc_urls]
+
+# Mainnet RPC URLs
+[rpc_urls.um]
+description = "Mainnet URLs"
+urls = [
+    "https://solana-rpc.publicnode.com",    # Public Backup Mainnet
+    "https://api.mainnet-beta.solana.com",  # Primary Mainnet
+]
+
+# Testnet RPC URLs
+[rpc_urls.ut]
+description = "Testnet URLs"
+urls = [
+    "https://solana-testnet-rpc.publicnode.com",  # Public Backup Testnet
+    "https://api.testnet.solana.com",             # Primary Testnet
+]
+
+# Logging configuration
+[logging]
+# Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+level = "INFO"
+# Log file location (empty for console only)
+file = ""
+
+# Tracker configurations
+[trackers]
+# List of ranks to compare against for TVC Tracker on mainnet
+compare_ranks_um = [1,5,10,25,50,75,100,150,200,250,300,350,400,450,500,550,600,650,700,750,800,850,900,950,1000,1050,1100,1150,1200,1250,1300,1350,1400]
+
+# List of ranks to compare against for TVC Tracker on testnet
+compare_ranks_ut = [1,5,10,25,50,75,100,150,200,250,300,350,400,450,500,600,700,800,900,1000,1200,1400,1600,1800,2000,2200,2400,2600,2800,3000,3200,3400]
+
+## **********BUILDKIT CONFIG***********
+
+# Repository URLs
+[repositories]
+agave_official = "https://github.com/anza-xyz/agave.git"
+agave_mod = "" # Add your custom repo URL here
+jito_official = "https://github.com/jito-foundation/jito-solana.git"
+jito_mod = "" # Add your custom repo URL here
+firedancer_official = "https://github.com/firedancer-io/firedancer.git"
+firedancer_mod = "" # Add your custom repo URL here
+
+# Path configurations
+[paths]
+# Installation directory for buildkit
+install_dir = "/home/sol/.local/share/solana/install/releases"
+# Base directory for source code checkouts (used by Agave, Jito)
+source_dir = "/home/sol/source-files"
+# Symlink path to active release
+symlink_path = "/home/sol/.local/share/solana/install/active_release"
+
+# Project-specific path configurations
+[paths.firedancer]
+# Special subpath for firedancer symlink
+symlink_subpath = "build/native/gcc"
+
+# Build configurations
+[build]
+# Number of parallel jobs to use during building
+# Default value set to 4 to be extremely conservative in case build is run on a live/voting node
+# Recommend using the build_threads arg to override to a higher value for a faster builds on non-voting nodes 
+parallel_jobs = 4 

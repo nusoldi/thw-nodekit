@@ -1,0 +1,65 @@
+# Local configuration files
+config.local.toml
+
+# Python bytecode and cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Python build artifacts
+*.so
+.Python
+/build/
+build/lib/
+build/bdist.*/
+build/temp.*/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Binary files
+*.dll
+*.dylib
+
+# Virtual environments
+venv/
+env/
+ENV/
+.env/
+.venv/
+
+# Development environments
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Operating System
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Local dependencies
+.local/
+
+# Development scripts
+push-changes.bat
+push-changes.sh
+
+# Exclude reference files
+/references/
+*_raw.json
+*_formatted.json

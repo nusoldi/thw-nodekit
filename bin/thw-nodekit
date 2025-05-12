@@ -1,0 +1,17 @@
+#!/bin/bash
+
+# Determine the absolute path to the installation directory
+INSTALL_DIR=$(dirname $(dirname $(readlink -f "$0")))
+
+# Set up the Python path and run with error handling
+PYTHONPATH=$INSTALL_DIR/lib:$INSTALL_DIR python3 -c "
+try:
+    from thw_nodekit.cli import main
+    main()
+except Exception as e:
+    import traceback
+    print('ERROR: THW-NodeKit failed to start:')
+    print(f'{type(e).__name__}: {e}')
+    traceback.print_exc()
+    exit(1)
+" "$@"
