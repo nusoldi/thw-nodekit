@@ -163,7 +163,9 @@ Tracks vote credits in real-time for a specified validator.
 
 *Note 1: It is advised to not run this monitor on a live node given the heavy RPC calls required. We run it on our monitoring VPS with minimal specs (4 GB RAM / 2 vCPUs) and it runs great (alongside Grafana/Watchtower/etc).*
 
-*Note 2: The way `missed_credits` are calculated is against the Rank 1 validator in the cluster, rather than a hypothetical "optimal" validator (such as how vxtools measures it). We took this approach for simplicity as the difference between TVC ranks is primarily what we're looking to measure.*
+*Note 2: The console window will automatically resize when you zoom in/out. Use Ctrl + +/- on most consoles to do this (i.e. Ctrl + - (Ctrl and Minus key) to zoom out so it fits)*
+
+*Note 3: The way `missed_credits` are calculated is against the Rank 1 validator in the cluster, rather than a hypothetical "optimal" validator (such as how vxtools measures it). We took this approach for simplicity as the difference between TVC ranks is primarily what we're looking to measure.*
 
 *   **Arguments**:
     *   `cluster` (Required): Cluster to use.
