@@ -30,6 +30,7 @@ def _run_command(
     # Merge with existing environment if env is provided
     process_env = os.environ.copy()
     if env:
+        logger.info(f"With additional environment variables: {env}")
         process_env.update(env)
 
     # Determine stdout/stderr handling

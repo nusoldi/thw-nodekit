@@ -27,7 +27,8 @@ class BaseBuilder(abc.ABC):
         repo_type: str, # e.g., 'official' or 'mod'
         tag: str,
         update_symlink: bool,
-        build_threads: int
+        build_threads: int,
+        native_build: bool
     ):
         self.config = config
         self.client = client
@@ -35,6 +36,7 @@ class BaseBuilder(abc.ABC):
         self.tag = tag
         self.update_symlink = update_symlink
         self.build_threads = build_threads
+        self.native_build = native_build
 
         # Derive configuration values
         self.repo_url = config.get_repo_url(client, repo_type)
@@ -46,6 +48,11 @@ class BaseBuilder(abc.ABC):
         self.symlink_path = config.get_symlink_path()
         self.symlink_target = config.get_symlink_target(client, tag) # Handles Firedancer vs others
         self.build_env = {"CARGO_BUILD_JOBS": str(build_threads)}
+
+        # Add native build RUSTFLAGS if enabled
+        if self.native_build:
+            self.build_env["RUSTFLAGS"] = "-C target-cpu=native"
+            logger.info("Native build optimizations enabled (target-cpu=native).")
 
     def _log_step_start(self, step_number: int, description: str):
         """Logs the start of a build step."""
@@ -62,7 +69,7 @@ class BaseBuilder(abc.ABC):
         # Determine max label length for alignment
         labels = [
             "Client:", "Type:", "Release Tag:", "Repository:", 
-            "Source Directory:", "Install Directory:", "Build Threads:",
+            "Source Directory:", "Install Directory:", "Build Threads:", "Native CPU Build:",
             "Symlink Update:", "Symlink Path:", "Symlink Target:"
         ]
         max_label_len = max(len(label) for label in labels)
@@ -82,6 +89,7 @@ class BaseBuilder(abc.ABC):
             "Source Directory:": self.source_dir,
             "Install Directory:": self.install_dir,
             "Build Threads:": self.build_threads,
+            "Native CPU Build:": "ENABLED" if self.native_build else "DISABLED",
             "Symlink Update:": "ENABLED" if self.update_symlink else "DISABLED",
         }
         if self.update_symlink:
@@ -105,6 +113,7 @@ class BaseBuilder(abc.ABC):
         print(f"{COLOR_BRIGHT_CYAN}{'Source Directory:':<{padding}}{COLOR_RESET}{self.source_dir}")
         print(f"{COLOR_BRIGHT_CYAN}{'Install Directory:':<{padding}}{COLOR_RESET}{self.install_dir}")
         print(f"{COLOR_BRIGHT_CYAN}{'Build Threads:':<{padding}}{COLOR_RESET}{self.build_threads}")
+        print(f"{COLOR_BRIGHT_CYAN}{'Native CPU Build:':<{padding}}{COLOR_RESET}{'ENABLED' if self.native_build else 'DISABLED'}")
 
         if self.update_symlink:
             print(f"{COLOR_BRIGHT_CYAN}{'Symlink Update:':<{padding}}{COLOR_RESET}ENABLED")

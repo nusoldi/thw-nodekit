@@ -34,6 +34,11 @@ def setup_buildkit_parser(parser: argparse.ArgumentParser):
         help="Whether to update the active_release symlink (true or false)."
     )
     parser.add_argument(
+        "native_build",
+        choices=["true", "false"],
+        help="Whether to build for the native CPU architecture (true or false)."
+    )
+    parser.add_argument(
         "build_threads", 
         type=int, 
         nargs='?', # Optional argument
@@ -76,6 +81,9 @@ def run_build(args: argparse.Namespace):
         # Convert update_symlink string to boolean
         update_symlink_bool = args.update_symlink.lower() == 'true'
 
+        # Determine native build setting from the new positional argument
+        native_build_bool = args.native_build.lower() == 'true'
+
         # Get the appropriate builder instance
         builder = get_builder(
             config=config,
@@ -83,7 +91,8 @@ def run_build(args: argparse.Namespace):
             repo_type=args.type,
             tag=args.tag,
             update_symlink=update_symlink_bool,
-            build_threads=build_threads
+            build_threads=build_threads,
+            native_build=native_build_bool
         )
         
         # Execute the build process (includes confirmation prompt)

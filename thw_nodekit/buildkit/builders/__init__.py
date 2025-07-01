@@ -23,7 +23,8 @@ def get_builder(
     repo_type: str,
     tag: str,
     update_symlink: bool,
-    build_threads: int
+    build_threads: int,
+    native_build: bool
 ) -> BaseBuilder:
     """Factory function to get the correct builder instance.
 
@@ -34,6 +35,7 @@ def get_builder(
         tag: Release tag string.
         update_symlink: Boolean indicating if symlink should be updated.
         build_threads: Number of parallel build jobs.
+        native_build: Boolean indicating if the build is native.
 
     Returns:
         An instance of the appropriate BaseBuilder subclass.
@@ -51,7 +53,8 @@ def get_builder(
             repo_type=repo_type,
             tag=tag,
             update_symlink=update_symlink,
-            build_threads=build_threads
+            build_threads=build_threads,
+            native_build=native_build
         )
     else:
         logger.error(f"Unknown client specified: {client}")
