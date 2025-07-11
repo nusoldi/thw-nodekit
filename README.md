@@ -318,8 +318,7 @@ Orchestrates a nearly instantaneous identity swap (failover) between two validat
         ```bash
         thw-nodekit failover validator-1 validator-2 mainnet
         ```
-![image](https://github.com/user-attachments/assets/cdd1a04d-e975-43a9-bf09-646efc524029)
-
+        
 ---
 
 #### Other `Toolkit` Commands (Future Development)
