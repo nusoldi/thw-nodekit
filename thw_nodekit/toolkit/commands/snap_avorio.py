@@ -5,11 +5,11 @@ import logging
 from thw_nodekit.config import get_config
 
 # ANSI Color Codes
-COLOR_BOLD_GREEN = "\033[1;32m"
-COLOR_BRIGHT_CYAN = "\033[1;36m"
-COLOR_YELLOW = "\033[1;33m"
-COLOR_RED = "\033[1;31m"
-COLOR_RESET = "\033[0m"
+C_GREEN = "\033[1;32m"
+C_CYAN = "\033[1;36m"
+C_YELLOW = "\033[1;33m"
+C_BOLD_RED = "\033[1;31m"
+C_NC = "\033[0m"
 
 logger = logging.getLogger(__name__)
 
@@ -29,12 +29,12 @@ def download_snapshot(cluster: str, snap_type: str):
         snaps_dir = config.get("toolkit.snapshot_dir_ut")
     else:
         logger.error(f"Invalid cluster '{cluster}'. Valid options: 'um' (mainnet), 'ut' (testnet)")
-        print(f"{COLOR_RED}Error: Invalid cluster '{cluster}'. Valid options: 'um' (mainnet), 'ut' (testnet){COLOR_RESET}")
+        print(f"{C_BOLD_RED}Error: Invalid cluster '{cluster}'. Valid options: 'um' (mainnet), 'ut' (testnet){C_NC}")
         return False
 
     if not snaps_dir:
         logger.error(f"Snapshot directory for cluster '{cluster}' not configured. Please set 'toolkit.snapshot_dir_{cluster}'.")
-        print(f"{COLOR_RED}Error: Snapshot directory for cluster '{cluster}' not configured. Please set 'toolkit.snapshot_dir_{cluster}'.{COLOR_RESET}")
+        print(f"{C_BOLD_RED}Error: Snapshot directory for cluster '{cluster}' not configured. Please set 'toolkit.snapshot_dir_{cluster}'.{C_NC}")
         return False
 
     full_snapshot_url = f"{base_url}/snapshot.tar.bz2"
@@ -51,19 +51,19 @@ def download_snapshot(cluster: str, snap_type: str):
         snap_urls.extend([incr_snapshot_url, full_snapshot_url])
     else:
         logger.error(f"Invalid snapshot type '{snap_type}'. Valid options: 'full', 'incr', 'both'.")
-        print(f"{COLOR_RED}Error: Invalid snapshot type '{snap_type}'. Valid options: 'full', 'incr', 'both'.{COLOR_RESET}")
+        print(f"{C_BOLD_RED}Error: Invalid snapshot type '{snap_type}'. Valid options: 'full', 'incr', 'both'.{C_NC}")
         return False
 
     if not snap_urls:
         logger.error("No snapshot URLs determined. This should not happen if type is valid.")
-        print(f"{COLOR_RED}Error: No snapshot URLs determined.{COLOR_RESET}")
+        print(f"{C_BOLD_RED}Error: No snapshot URLs determined.{C_NC}")
         return False
 
     # --- User Confirmation --- 
     separator = "-" * 120
-    print(f"{COLOR_BRIGHT_CYAN}{separator}{COLOR_RESET}")
-    print(f"{COLOR_BOLD_GREEN}THW-NodeKit {COLOR_BRIGHT_CYAN}| Snapshot Download (Avorio Network){COLOR_RESET}")
-    print(f"{COLOR_BRIGHT_CYAN}{separator}{COLOR_RESET}")
+    print(f"{C_CYAN}{separator}{C_NC}")
+    print(f"{C_GREEN}THW-NodeKit {C_CYAN}| Snapshot Download (Avorio Network){C_NC}")
+    print(f"{C_CYAN}{separator}{C_NC}")
 
     details = {
         "Cluster": cluster_name,
@@ -78,29 +78,29 @@ def download_snapshot(cluster: str, snap_type: str):
         if label == "Source URL(s)":
             urls = value.splitlines()
             if urls:
-                print(f"{COLOR_BRIGHT_CYAN}{label + ':':<{padding}}{COLOR_RESET}{urls[0]}")
+                print(f"{C_CYAN}{label + ':':<{padding}}{C_NC}{urls[0]}")
                 for i in range(1, len(urls)):
                     print(f"{'':<{padding}}{urls[i]}")
             else:
-                print(f"{COLOR_BRIGHT_CYAN}{label + ':':<{padding}}{COLOR_RESET}")
+                print(f"{C_CYAN}{label + ':':<{padding}}{C_NC}")
         elif "\n" in value:
-            print(f"{COLOR_BRIGHT_CYAN}{label + ':':<{padding}}{COLOR_RESET}{value.splitlines()[0]}")
+            print(f"{C_CYAN}{label + ':':<{padding}}{C_NC}{value.splitlines()[0]}")
             for line in value.splitlines()[1:]:
                 print(f"{'':<{padding}}{line}")
         else:
-            print(f"{COLOR_BRIGHT_CYAN}{label + ':':<{padding}}{COLOR_RESET}{value}")
+            print(f"{C_CYAN}{label + ':':<{padding}}{C_NC}{value}")
     
-    print(f"{COLOR_BRIGHT_CYAN}{separator}{COLOR_RESET}")
+    print(f"{C_CYAN}{separator}{C_NC}")
 
     try:
-        confirm = input(f"{COLOR_BOLD_GREEN}Proceed with download? (y/n): {COLOR_RESET}").strip().lower()
+        confirm = input(f"{C_GREEN}Proceed with download? (y/n): {C_NC}").strip().lower()
         if confirm != 'y':
             logger.warning("Snapshot download cancelled by user.")
-            print(f"{COLOR_YELLOW}Snapshot download cancelled by user.{COLOR_RESET}")
+            print(f"{C_YELLOW}Snapshot download cancelled by user.{C_NC}")
             return True
     except EOFError:
         logger.warning("EOFError reading input (non-interactive environment?). Aborting download for safety.")
-        print(f"{COLOR_YELLOW}Snapshot download aborted due to non-interactive environment.{COLOR_RESET}")
+        print(f"{C_YELLOW}Snapshot download aborted due to non-interactive environment.{C_NC}")
         return True
 
     # --- End User Confirmation ---
@@ -125,17 +125,17 @@ def download_snapshot(cluster: str, snap_type: str):
 
         if process.returncode == 0:
             logger.info("Download completed successfully via aria2c.")
-            print(f"\n{COLOR_BOLD_GREEN}Download completed successfully.{COLOR_RESET}")
+            print(f"\n{C_GREEN}Download completed successfully.{C_NC}")
             return True
         else:
             logger.error(f"Error during download with aria2c. Return code: {process.returncode}")
-            print(f"\n{COLOR_RED}Error during download with aria2c. Return code: {process.returncode}{COLOR_RESET}")
+            print(f"\n{C_BOLD_RED}Error during download with aria2c. Return code: {process.returncode}{C_NC}")
             return False
     except FileNotFoundError:
         logger.error("aria2c command not found.")
-        print(f"{COLOR_RED}Error: aria2c command not found.{COLOR_RESET}")
+        print(f"{C_BOLD_RED}Error: aria2c command not found.{C_NC}")
         return False
     except Exception as e:
         logger.exception(f"An unexpected error occurred during snap_avorio download process: {e}")
-        print(f"{COLOR_RED}An unexpected error occurred: {e}{COLOR_RESET}")
+        print(f"{C_BOLD_RED}An unexpected error occurred: {e}{C_NC}")
         return False

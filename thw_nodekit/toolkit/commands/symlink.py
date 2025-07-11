@@ -10,11 +10,11 @@ from thw_nodekit.config import get_config, Config
 logger = logging.getLogger(__name__)
 
 # ANSI Color Codes
-COLOR_BOLD_GREEN = "\033[1;32m"
-COLOR_BRIGHT_CYAN = "\033[1;36m"
-COLOR_YELLOW = "\033[1;33m"
-COLOR_RED = "\033[1;31m"
-COLOR_RESET = "\033[0m"
+C_GREEN = "\033[1;32m"
+C_CYAN = "\033[1;36m"
+C_YELLOW = "\033[1;33m"
+C_BOLD_RED = "\033[1;31m"
+C_NC = "\033[0m"
 
 def _create_symlink_internal(target_path_str: str, link_path_str: str) -> bool:
     """
@@ -178,9 +178,9 @@ def manage_symlink(client: str, tag: str, config_path: Optional[str] = None) -> 
 
     # User confirmation section
     separator = "-" * 120
-    print(f"{COLOR_BRIGHT_CYAN}{separator}{COLOR_RESET}")
-    print(f"{COLOR_BOLD_GREEN}THW-NodeKit {COLOR_BRIGHT_CYAN}| Symlink Update{COLOR_RESET}")
-    print(f"{COLOR_BRIGHT_CYAN}{separator}{COLOR_RESET}")
+    print(f"{C_CYAN}{separator}{C_NC}")
+    print(f"{C_GREEN}THW-NodeKit {C_CYAN}| Symlink Update{C_NC}")
+    print(f"{C_CYAN}{separator}{C_NC}")
     
     details = {
         "Client": client, # Changed from "Project" to "Client" for consistency with other parts of nodekit
@@ -194,12 +194,12 @@ def manage_symlink(client: str, tag: str, config_path: Optional[str] = None) -> 
     padding = max_label_len + 4
 
     for label, value in details.items():
-        print(f"{COLOR_BRIGHT_CYAN}{label + ':':<{padding}}{COLOR_RESET}{value}")
+        print(f"{C_CYAN}{label + ':':<{padding}}{C_NC}{value}")
     
-    print(f"{COLOR_BRIGHT_CYAN}{separator}{COLOR_RESET}") # Use full separator
+    print(f"{C_CYAN}{separator}{C_NC}") # Use full separator
     
     try:
-        confirm = input(f"{COLOR_BOLD_GREEN}Proceed with update? (y/n): {COLOR_RESET}")
+        confirm = input(f"{C_GREEN}Proceed with update? (y/n): {C_NC}")
         if confirm.lower() != 'y':
             logger.warning("Symlink update aborted by user.")
             # Exiting successfully as it's a user choice, not an error.
@@ -218,5 +218,5 @@ def manage_symlink(client: str, tag: str, config_path: Optional[str] = None) -> 
     # Run version check after symlink update
     _verify_versions(client, tag, symlink_path_str)
     
-    print(f"{COLOR_BOLD_GREEN}STATUS: Done.{COLOR_RESET}")
+    print(f"{C_GREEN}STATUS: Done.{C_NC}")
     return True

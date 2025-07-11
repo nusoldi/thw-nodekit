@@ -9,11 +9,11 @@ from thw_nodekit.config import get_config
 logger = logging.getLogger("thw_nodekit.toolkit.affinity")
 
 # ANSI Color Codes
-COLOR_BOLD_GREEN = "\033[1;32m"
-COLOR_BRIGHT_CYAN = "\033[1;36m"
-COLOR_YELLOW = "\033[1;33m"
-COLOR_RED = "\033[1;31m"
-COLOR_RESET = "\033[0m"
+C_GREEN = "\033[1;32m"
+C_CYAN = "\033[1;36m"
+C_YELLOW = "\033[1;33m"
+C_BOLD_RED = "\033[1;31m"
+C_NC = "\033[0m"
 
 def _find_agave_validator_pid() -> Optional[int]:
     """Finds the PID of the running agave-validator process."""
@@ -98,13 +98,13 @@ def manage_affinity(core_override: Optional[int] = None) -> None:
 
         if len(current_affinity) == 1 and current_affinity[0] == target_core:
             logger.info(f"affinity: solPohTickProd_already_set to core {target_core}.")
-            print(f"{COLOR_YELLOW}Thread solPohTickProd (TID: {thread_tid}) is already set to core {target_core}.{COLOR_RESET}")
+            print(f"{C_YELLOW}Thread solPohTickProd (TID: {thread_tid}) is already set to core {target_core}.{C_NC}")
             sys.exit(0)
         else:
             separator = "-" * 120
-            print(f"{COLOR_BRIGHT_CYAN}{separator}{COLOR_RESET}")
-            print(f"{COLOR_BOLD_GREEN}THW-NodeKit {COLOR_BRIGHT_CYAN}| PoH Thread CPU Affinity Utility{COLOR_RESET}")
-            print(f"{COLOR_BRIGHT_CYAN}{separator}{COLOR_RESET}")
+            print(f"{C_CYAN}{separator}{C_NC}")
+            print(f"{C_GREEN}THW-NodeKit {C_CYAN}| PoH Thread CPU Affinity Utility{C_NC}")
+            print(f"{C_CYAN}{separator}{C_NC}")
 
             details = {
                 "Agave Validator PID": str(solana_pid),
@@ -116,17 +116,17 @@ def manage_affinity(core_override: Optional[int] = None) -> None:
             padding = max_label_len + 4
 
             for label, value in details.items():
-                print(f"{COLOR_BRIGHT_CYAN}{label + ':':<{padding}}{COLOR_RESET}{value}")
+                print(f"{C_CYAN}{label + ':':<{padding}}{C_NC}{value}")
             
-            print(f"{COLOR_BRIGHT_CYAN}{separator}{COLOR_RESET}")
+            print(f"{C_CYAN}{separator}{C_NC}")
 
             if os.geteuid() != 0:
                 logger.warning("This command may require root (sudo) privileges to change CPU affinity.")
-                print(f"{COLOR_YELLOW}Warning: This command may require root (sudo) privileges to change CPU affinity.{COLOR_RESET}")
+                print(f"{C_YELLOW}Warning: This command may require root (sudo) privileges to change CPU affinity.{C_NC}")
                 print() # Blank line for spacing before the prompt
 
             try:
-                confirm = input(f"{COLOR_BOLD_GREEN}Proceed to set affinity to core {target_core}? (y/n): {COLOR_RESET}").strip().lower()
+                confirm = input(f"{C_GREEN}Proceed to set affinity to core {target_core}? (y/n): {C_NC}").strip().lower()
                 
                 if confirm == 'y':
                     target_thread_proc.cpu_affinity([target_core])
@@ -134,29 +134,29 @@ def manage_affinity(core_override: Optional[int] = None) -> None:
                     if len(new_affinity) == 1 and new_affinity[0] == target_core:
                         logger.info(f"affinity: set_done. Successfully set affinity for TID {thread_tid} to [{target_core}].")
                         logger.info(f"Verified new affinity: {new_affinity}")
-                        print(f"{COLOR_BOLD_GREEN}Successfully set affinity for TID {thread_tid} to {new_affinity}.{COLOR_RESET}")
+                        print(f"{C_GREEN}Successfully set affinity for TID {thread_tid} to {new_affinity}.{C_NC}")
                     else:
                         logger.error(f"affinity: set_failed. Attempted to set core {target_core}, but current is {new_affinity}.")
-                        print(f"{COLOR_RED}Error: Failed to set affinity. Current affinity is {new_affinity}.{COLOR_RESET}")
+                        print(f"{C_BOLD_RED}Error: Failed to set affinity. Current affinity is {new_affinity}.{C_NC}")
                         sys.exit(1)
                 else:
                     logger.info("User cancelled affinity change.")
-                    print(f"{COLOR_YELLOW}Affinity change cancelled by user.{COLOR_RESET}")
+                    print(f"{C_YELLOW}Affinity change cancelled by user.{C_NC}")
                     sys.exit(0)
             except EOFError:
                 logger.warning("EOFError reading input (non-interactive environment?). Aborting affinity change for safety.")
-                print(f"{COLOR_YELLOW}Affinity change aborted due to non-interactive environment.{COLOR_RESET}")
+                print(f"{C_YELLOW}Affinity change aborted due to non-interactive environment.{C_NC}")
                 sys.exit(1) # Exit with an error code
 
     except psutil.NoSuchProcess:
         logger.error(f"affinity: Thread with TID {thread_tid} no longer found. It might have terminated.")
-        print(f"{COLOR_RED}Error: Thread with TID {thread_tid} no longer found. It might have terminated.{COLOR_RESET}")
+        print(f"{C_BOLD_RED}Error: Thread with TID {thread_tid} no longer found. It might have terminated.{C_NC}")
         sys.exit(1)
     except psutil.AccessDenied:
         logger.error(f"affinity: Access Denied. Run with sudo or as root to change CPU affinity.")
-        print(f"{COLOR_RED}Error: Access Denied. Please run with sudo or as root to change CPU affinity.{COLOR_RESET}")
+        print(f"{C_BOLD_RED}Error: Access Denied. Please run with sudo or as root to change CPU affinity.{C_NC}")
         sys.exit(1)
     except Exception as e:
         logger.exception(f"An unexpected error occurred while managing affinity for TID {thread_tid}")  # exception includes stack trace
-        print(f"{COLOR_RED}An unexpected error occurred: {e}{COLOR_RESET}")
+        print(f"{C_BOLD_RED}An unexpected error occurred: {e}{C_NC}")
         sys.exit(1)

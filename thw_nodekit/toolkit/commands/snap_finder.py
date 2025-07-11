@@ -16,11 +16,11 @@ import statistics
 from thw_nodekit.config import get_config
 
 # ANSI Color Codes
-COLOR_BOLD_GREEN = "\033[1;32m"
-COLOR_BRIGHT_CYAN = "\033[1;36m"
-COLOR_YELLOW = "\033[1;33m"
-COLOR_RED = "\033[1;31m"
-COLOR_RESET = "\033[0m"
+C_GREEN = "\033[1;32m"
+C_CYAN = "\033[1;36m"
+C_YELLOW = "\033[1;33m"
+C_BOLD_RED = "\033[1;31m"
+C_NC = "\033[0m"
 
 # --- Module-level variables (will be configured by find_snapshot_and_download) ---
 # Configuration (set by find_snapshot_and_download based on its args and defaults)
@@ -560,9 +560,9 @@ def run_snap_finder(cluster_arg: str, verbose: bool = False):
 
     # --- User Confirmation --- 
     separator = "-" * 120
-    print(f"{COLOR_BRIGHT_CYAN}{separator}{COLOR_RESET}")
-    print(f"{COLOR_BOLD_GREEN}THW-NodeKit {COLOR_BRIGHT_CYAN}| Snapshot Download (Snapshot Finder){COLOR_RESET}")
-    print(f"{COLOR_BRIGHT_CYAN}{separator}{COLOR_RESET}")
+    print(f"{C_CYAN}{separator}{C_NC}")
+    print(f"{C_GREEN}THW-NodeKit {C_CYAN}| Snapshot Download (Snapshot Finder){C_NC}")
+    print(f"{C_CYAN}{separator}{C_NC}")
 
     cluster_map = {"um": "Mainnet", "ut": "Testnet"} # Map for display names
     display_cluster_name = cluster_map.get(cluster_arg.lower(), cluster_arg.upper())
@@ -576,19 +576,19 @@ def run_snap_finder(cluster_arg: str, verbose: bool = False):
     padding = max_label_len + 4
 
     for label, value in details.items():
-        print(f"{COLOR_BRIGHT_CYAN}{label + ':':<{padding}}{COLOR_RESET}{value}")
+        print(f"{C_CYAN}{label + ':':<{padding}}{C_NC}{value}")
     
-    print(f"{COLOR_BRIGHT_CYAN}{separator}{COLOR_RESET}")
+    print(f"{C_CYAN}{separator}{C_NC}")
 
     try:
-        confirm = input(f"{COLOR_BOLD_GREEN}Proceed with snapshot search and download? (y/n): {COLOR_RESET}").strip().lower()
+        confirm = input(f"{C_GREEN}Proceed with snapshot search and download? (y/n): {C_NC}").strip().lower()
         if confirm != 'y':
             logger.warning("Snapshot finder operation cancelled by user.")
-            print(f"{COLOR_YELLOW}Snapshot finder operation cancelled by user.{COLOR_RESET}")
+            print(f"{C_YELLOW}Snapshot finder operation cancelled by user.{C_NC}")
             return False # User cancelled
     except EOFError:
         logger.warning("EOFError reading input (non-interactive environment?). Aborting snapshot finder.")
-        print(f"{COLOR_YELLOW}Snapshot finder operation aborted due to non-interactive environment.{COLOR_RESET}")
+        print(f"{C_YELLOW}Snapshot finder operation aborted due to non-interactive environment.{C_NC}")
         return False # Treat as cancellation
     # --- End User Confirmation ---
 
@@ -651,7 +651,7 @@ def run_snap_finder(cluster_arg: str, verbose: bool = False):
 
         if worker_result == 0: 
             logger.info("Snapshot operation completed successfully.")
-            print(f"{COLOR_BOLD_GREEN}Snapshot operation completed successfully.{COLOR_RESET}")
+            print(f"{C_GREEN}Snapshot operation completed successfully.{C_NC}")
             return True
         
         logger.warning(f"Snapshot operation failed on attempt {num_attempts_made}.")
@@ -665,5 +665,5 @@ def run_snap_finder(cluster_arg: str, verbose: bool = False):
         time.sleep(_SLEEP_BEFORE_RETRY)
 
     logger.error(f"Failed to find and download a suitable snapshot after {_NUM_OF_MAX_ATTEMPTS} attempts.")
-    print(f"{COLOR_RED}Failed to find and download a suitable snapshot after {_NUM_OF_MAX_ATTEMPTS} attempts.{COLOR_RESET}")
+    print(f"{C_BOLD_RED}Failed to find and download a suitable snapshot after {_NUM_OF_MAX_ATTEMPTS} attempts.{C_NC}")
     return False
