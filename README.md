@@ -3,7 +3,7 @@
 **THW-NodeKit** is a toolkit for Solana validator **operatoooooooooors**, created by Nu_Soldi ([@nusoldi](https://github.com/nusoldi), [@Nu_Soldi](https://x.com/Nu_Soldi)) on behalf of **THW Validator** ([trulyhonestwork.io](https://trulyhonestwork.io/), [@trulyhonestwork](https://x.com/trulyhonestwork)). *It ain't much, but it's Truly Honest Work™.*
 
 
-***Note from the creator***: *This project was originally created to simplify a bunch of random bash scripts and tools into a singular CLI for personal ease-of-use. The implementation is Python-based due to experience in the language. Significant assistance from Gemini was used; I am not a full-time dev by any stretch of the imagination. There are surely edge cases not yet accounted for and error handling could be better. However, as it stands, everything has worked for us without issue in its current form, so long as it's used as intended. It is being shared publically in the case it helps anyone else in the community. We welcome feedback/collaboration on future enhancements.*
+***Note from the creator***: *This project was originally created to simplify a bunch of random bash scripts and tools into a singular CLI for personal ease-of-use. The implementation is Python-based due to experience in the language. It is being shared publically in the case it helps anyone else in the community. We welcome feedback/collaboration on future enhancements.*
 
 
 ## Core Components
@@ -20,6 +20,7 @@ THW-NodeKit provides a unified command-line interface (CLI) with various functio
     *   Control over build threads/jobs to ensure new releases can safely be installed on live/voting nodes
 *   **`Toolkit` Details**:
     *   Real-time TVC tracker `tvc` for any validator on mainnet (um) or testnet (ut).
+    *   Agave identity swap command `failover` for robust and efficient validator failovers
     *   Snapshot downloads via the Avorio network `snap-avorio`  or the Snapshot Finder tool `snap-finder`
     *   Affinity command `affinity` to set the Agave PoH thread to a specific core
     *   Symlink command `symlink` to update the active_release based on the client/version (TAG)
@@ -294,9 +295,36 @@ Creates or updates the `active_release` symlink for a specified Solana client ve
 
 ---
 
+#### `failover`: Perform Validator Identity Swap (Failover)
+
+Orchestrates a nearly instantaneous identity swap (failover) between two validator nodes: an active (local) node and an inactive 'hotspare' (remote) node. This command automates the process of changing identities, transferring the tower file, and updating symlinks on both nodes to ensure a seamless transition.
+
+*Note: This command is a powerful tool that performs significant changes on both nodes. It is critical to have your `config.local.toml` file correctly configured for both the active (`from_host`) and inactive (`to_host`) nodes before execution. The script performs extensive pre-flight checks to validate configurations and paths on both machines before prompting for final confirmation.*
+
+*   **Arguments**:
+    *   `from_host` (Required): The hostname of the currently **ACTIVE** (local) node, as defined in your config file. The script must be run from this node.
+    *   `to_host` (Required): The hostname of the **INACTIVE** (remote) node, as defined in your config file.
+    *   `cluster` (Required): The cluster context for the failover.
+        *   Choices: `mainnet`, `testnet`
+*   **Configuration**:
+    *   Your `config.local.toml` must contain sections for both hosts, using the format `[<hostname>.<cluster>]`. For example: `[validator-1.mainnet]` and `[validator-2.mainnet]`.
+    *   Each host's configuration section must be fully populated with correct paths (ledger, keypairs, solana binaries) and SSH details (user, ip, key path).
+*   **Syntax**:
+    ```bash
+    thw-nodekit failover <from_host> <to_host> <cluster>
+    ```
+*   **Examples**:
+    *   Perform a failover from `validator-1` to `validator-2` on `mainnet`:
+        ```bash
+        thw-nodekit failover validator-1 validator-2 mainnet
+        ```
+![image](https://github.com/user-attachments/assets/cdd1a04d-e975-43a9-bf09-646efc524029)
+
+---
+
 #### Other `Toolkit` Commands (Future Development)
 
-Additional commands and utilities for the `Toolkit` are planned and will be detailed here as they become available. Top of the list is an identity swap implementation for use with hotspare nodes.
+Additional commands and utilities for the `Toolkit` are planned and will be detailed here as they become available.
 
 ## Uninstallation
 

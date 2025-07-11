@@ -83,3 +83,22 @@ def handle_symlink_command(args: Any):
         # The manage_symlink function logs errors but may return True if user aborts.
         # Only exit if it explicitly returns False indicating a script failure.
         sys.exit(1)
+
+# --- Failover Command ---
+def setup_failover_args(parser: argparse.ArgumentParser):
+    """Set up arguments for the 'failover' command."""
+    parser.add_argument("from_host", help="The hostname of the currently ACTIVE (local) node.")
+    parser.add_argument("to_host", help="The hostname of the INACTIVE (remote) node.")
+    parser.add_argument("cluster", choices=["mainnet", "testnet"], help="The cluster context for the failover.")
+
+def handle_failover_command(args: Any):
+    """Handle the 'failover' command."""
+    from thw_nodekit.toolkit.commands.failover import manage_failover
+    success = manage_failover(
+        from_host=args.from_host,
+        to_host=args.to_host,
+        cluster=args.cluster,
+        config_path=args.config if hasattr(args, "config") else None
+    )
+    if not success:
+        sys.exit(1)

@@ -1,5 +1,37 @@
 # THW-NodeKit Configuration
 
+## **********BUILDKIT CONFIG***********
+
+# Repository URLs
+[repositories]
+agave_official = "https://github.com/anza-xyz/agave.git"
+agave_mod = "" # Add your custom repo URL here
+jito_official = "https://github.com/jito-foundation/jito-solana.git"
+jito_mod = "" # Add your custom repo URL here
+firedancer_official = "https://github.com/firedancer-io/firedancer.git"
+firedancer_mod = "" # Add your custom repo URL here
+
+# Path configurations
+[paths]
+# Installation directory for buildkit
+install_dir = "/home/sol/.local/share/solana/install/releases"
+# Base directory for source code checkouts (used by Agave, Jito)
+source_dir = "/home/sol/source-files"
+# Symlink path to active release
+symlink_path = "/home/sol/.local/share/solana/install/active_release"
+
+# Project-specific path configurations
+[paths.firedancer]
+# Special subpath for firedancer symlink
+symlink_subpath = "build/native/gcc"
+
+# Build configurations
+[build]
+# Number of parallel jobs to use during building
+# Default value set to 4 to be extremely conservative in case build is run on a live/voting node
+# Recommend using the build_threads arg to override to a higher value for a faster builds on non-voting nodes 
+parallel_jobs = 4 
+
 ## **********TOOLKIT CONFIG***********
 
 [toolkit]
@@ -13,10 +45,9 @@ default_identity_um = "THWsLPufeq9LWs2H9vYPbtFwdxAHbQHvSbT6pztG8x1"  # Default v
 default_identity_ut = "THWn57216Xoen7wQ74j2RxcqUt3CMpaGaUvzo1kZdC1"  # Default validator identity for testnet
 
 # RPC URLs for different Solana clusters
-[rpc_urls]
-
 # Recommend adding private RPCs for better performance. Free RPCs available from Helius, Quicknode, Allnodes, etc.
 # TVC Tracker will cycle thru available RPCs below when rate limits are hit
+[rpc_urls]
 
 # Mainnet RPC URLs
 [rpc_urls.um]
@@ -49,34 +80,70 @@ compare_ranks_um = [1,5,10,25,50,75,100,150,200,250,300,350,400,450,500,550,600,
 # List of ranks to compare against for TVC Tracker on testnet
 compare_ranks_ut = [1,5,10,25,50,75,100,150,200,250,300,350,400,450,500,600,700,800,900,1000,1200,1400,1600,1800,2000,2200,2400,2600,2800,3000,3200,3400]
 
-## **********BUILDKIT CONFIG***********
+# Failover Configuration
+# Syntax = [hostname.cluster]
+# hostnames must match actual server hostname
+# cluster should be "mainnet" or "testnet"
+# Prerequisites and assumptions:
+# 1. SSH Access: Passwordless SSH key-based authentication must be configured with keys stored in ssh_key_path.
+# 2. Correct Paths: All file paths defined in 'config.default.toml' must be accurate and defined as absolute/full paths
+# 3. Correct User: This script must be run as the user that owns the validator process.
+# 4. Agave/Solana CLI: Binaries must be in the PATH defined in the config.
+# 5. Execution Location: The script MUST be executed on the currently LIVE/VOTING node.
 
-# Repository URLs
-[repositories]
-agave_official = "https://github.com/anza-xyz/agave.git"
-agave_mod = "" # Add your custom repo URL here
-jito_official = "https://github.com/jito-foundation/jito-solana.git"
-jito_mod = "" # Add your custom repo URL here
-firedancer_official = "https://github.com/firedancer-io/firedancer.git"
-firedancer_mod = "" # Add your custom repo URL here
+# EXAMPLES:
+[thw-testnet.testnet]
+hostname          = "thw-testnet"
+ip                = "12.34.567.890"
+user              = "sol"
+ssh_key_path      = "/home/sol/.ssh/thw-failover-sol"
+solana_path       = "/home/sol/.local/share/solana/install/active_release/bin/"
+ln_bin            = "/usr/bin/ln"
+ledger_path       = "/mnt/ledger"
+tower_path_dir    = "/mnt/ledger/"
+unstaked_keypair  = "/home/sol/junk-identity-keypair.json"
+validator_keypair = "/home/sol/validator-keypair.json"
+symlink_path      = "/home/sol/identity.json"
+agave_log         = "/home/sol/logs/agave-validator.log"
 
-# Path configurations
-[paths]
-# Installation directory for buildkit
-install_dir = "/home/sol/.local/share/solana/install/releases"
-# Base directory for source code checkouts (used by Agave, Jito)
-source_dir = "/home/sol/source-files"
-# Symlink path to active release
-symlink_path = "/home/sol/.local/share/solana/install/active_release"
+[thw-mainnet.mainnet]
+hostname          = "thw-mainnet"
+ip                = "98.76.543.210"
+user              = "sol"
+ssh_key_path      = "/home/sol/.ssh/thw-failover-sol"
+solana_path       = "/home/sol/.local/share/solana/install/active_release/bin/"
+ln_bin            = "/usr/bin/ln"
+ledger_path       = "/mnt/ledger"
+tower_path_dir    = "/mnt/ledger/"
+unstaked_keypair  = "/home/sol/junk-identity-keypair.json"
+validator_keypair = "/home/sol/validator-keypair.json"
+symlink_path      = "/home/sol/identity.json"
+agave_log         = "/home/sol/logs/agave-validator.log"
 
-# Project-specific path configurations
-[paths.firedancer]
-# Special subpath for firedancer symlink
-symlink_subpath = "build/native/gcc"
+[thw-hotspare.testnet]
+hostname          = "thw-hotspare"
+ip                = "69.69.696.969"
+user              = "sol"
+ssh_key_path      = "/home/sol/.ssh/thw-failover-sol"
+solana_path       = "/home/sol/.local/share/solana/install/active_release/bin/"
+ln_bin            = "/usr/bin/ln"
+ledger_path       = "/mnt/ledger/testnet"
+tower_path_dir    = "/mnt/ledger/testnet/"
+validator_keypair = "/home/sol/testnet/validator-keypair.json"
+unstaked_keypair  = "/home/sol/testnet/junk-identity-keypair.json"
+symlink_path      = "/home/sol/testnet/identity.json"
+agave_log         = "/home/sol/logs/testnet/agave-validator.log"
 
-# Build configurations
-[build]
-# Number of parallel jobs to use during building
-# Default value set to 4 to be extremely conservative in case build is run on a live/voting node
-# Recommend using the build_threads arg to override to a higher value for a faster builds on non-voting nodes 
-parallel_jobs = 4 
+[thw-hotspare.mainnet]
+hostname          = "thw-hotspare"
+ip                = "69.69.696.969"
+user              = "sol"
+ssh_key_path      = "/home/sol/.ssh/thw-failover-sol"
+solana_path       = "/home/sol/.local/share/solana/install/active_release/bin/"
+ln_bin            = "/usr/bin/ln"
+ledger_path       = "/mnt/ledger/mainnet"
+tower_path_dir    = "/mnt/ledger/mainnet/"
+validator_keypair = "/home/sol/mainnet/validator-keypair.json"
+unstaked_keypair  = "/home/sol/mainnet/junk-identity-keypair.json"
+symlink_path      = "/home/sol/mainnet/identity.json"
+agave_log         = "/home/sol/logs/mainnet/agave-validator.log"
