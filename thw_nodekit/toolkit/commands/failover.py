@@ -138,7 +138,6 @@ def run_pre_flight_checks(from_host, local_config, remote_config):
         f"SSH key ({local_config['ssh_key_path']})": (os.path.isfile, local_config['ssh_key_path']),
         "agave-validator executable": (os.access, os.path.join(local_config['solana_path'], "agave-validator"), os.X_OK),
         "solana-keygen executable": (os.access, os.path.join(local_config['solana_path'], "solana-keygen"), os.X_OK),
-        "ln executable": (os.access, local_config['ln_bin'], os.X_OK),
     }
     for desc, check in local_checks.items():
         log_msg("INFO", f"Checking: {desc}...")
@@ -158,7 +157,6 @@ def run_pre_flight_checks(from_host, local_config, remote_config):
         f"Remote validator keypair ({remote_config['validator_keypair']})": f"[ -f '{remote_config['validator_keypair']}' ]",
         "Remote agave-validator executable": f"[ -x '{os.path.join(remote_config['solana_path'], 'agave-validator')}' ]",
         "Remote solana-keygen executable": f"[ -x '{os.path.join(remote_config['solana_path'], 'solana-keygen')}' ]",
-        "Remote ln executable": f"[ -x '{remote_config['ln_bin']}' ]",
     }
     for desc, cmd in remote_checks.items():
         log_msg("INFO", f"Checking: {desc}...")
@@ -231,9 +229,7 @@ def display_confirmation_prompt(from_host, to_host, cluster, local_config, remot
     print(C_CYAN + "------------------------------------------------------------------------------------------------------------------------")
     print(f"{C_CYAN}(1). Change Identity to {C_BLUE}JUNK{C_NC}{C_CYAN}:{C_NC}")
     print(f"---> {local_config['solana_path']}agave-validator --ledger {local_config['ledger_path']} set-identity {local_config['unstaked_keypair']}")
-    print(f"{C_CYAN}(2). Update Symlink to {C_BLUE}JUNK{C_NC}{C_CYAN}:{C_NC}")
-    print(f"---> {local_config['ln_bin']} -sf {local_config['unstaked_keypair']} {local_config['symlink_path']}")
-    print(f"{C_CYAN}(3). Transfer Tower File:{C_NC}")
+    print(f"{C_CYAN}(2). Transfer Tower File:{C_NC}")
     print(f"---> cat {local_config.get('tower_path', '[local_tower_path]')} | ssh ... | dd of={remote_config.get('tower_path', '[remote_tower_path]')}")
 
     print(C_CYAN + "------------------------------------------------------------------------------------------------------------------------")
@@ -241,8 +237,6 @@ def display_confirmation_prompt(from_host, to_host, cluster, local_config, remot
     print(C_CYAN + "------------------------------------------------------------------------------------------------------------------------")
     print(f"{C_CYAN}(1). Change Identity to {C_GREEN}VALIDATOR{C_NC}{C_CYAN}:{C_NC}")
     print(f"---> {remote_config['solana_path']}agave-validator --ledger {remote_config['ledger_path']} set-identity {remote_config['require_tower_flag']} {remote_config['validator_keypair']}")
-    print(f"{C_CYAN}(2). Update Symlink to {C_GREEN}VALIDATOR{C_NC}{C_CYAN}:{C_NC}")
-    print(f"---> {remote_config['ln_bin']} -sf {remote_config['validator_keypair']} {remote_config['symlink_path']}")
     print(C_CYAN + "------------------------------------------------------------------------------------------------------------------------")
     
     try:
@@ -277,12 +271,6 @@ def execute_failover(from_host, to_host, local_config, remote_config):
     cmd_list = [os.path.join(local_config['solana_path'], 'agave-validator'), '--ledger', local_config['ledger_path'], 'set-identity', local_config['unstaked_keypair']]
     run_shell_command(cmd_list, f"Changing identity on local node ({C_BLUE}{from_host}{C_NC})...")
     timings['local_id_change'] = time.monotonic() - local_id_start
-    
-    # 3. Update local symlink
-    local_symlink_start = time.monotonic()
-    cmd_list = [local_config['ln_bin'], '-sf', local_config['unstaked_keypair'], local_config['symlink_path']]
-    run_shell_command(cmd_list, f"Updating symlink on local node ({C_BLUE}{from_host}{C_NC})...")
-    timings['local_symlink_update'] = time.monotonic() - local_symlink_start
 
     # 4. OPTIMIZATION: Combine tower transfer and remote commands into a single, pipelined SSH execution.
     ssh_opts = f"-i {local_config['ssh_key_path']} -o 'ControlMaster=auto' -o 'ControlPath=/tmp/ssh-%r@%h:%p' -o 'ControlPersist=yes'"
@@ -291,11 +279,10 @@ def execute_failover(from_host, to_host, local_config, remote_config):
     pipelined_total_start = time.monotonic()
 
     remote_set_id_cmd = f"{os.path.join(remote_config['solana_path'], 'agave-validator')} --ledger {remote_config['ledger_path']} set-identity {remote_config['require_tower_flag']} {remote_config['validator_keypair']}"
-    remote_symlink_cmd = f"{remote_config['ln_bin']} -sf {remote_config['validator_keypair']} {remote_config['symlink_path']}"
 
     # Chain the commands. `dd` reads from stdin until EOF, then the shell executes the rest via `&&`.
     # `set -ex` ensures that the script will exit immediately if any command fails.
-    chained_remote_cmds = f"dd of={remote_config['tower_path']} && set -ex; {remote_set_id_cmd}; {remote_symlink_cmd};"
+    chained_remote_cmds = f"dd of={remote_config['tower_path']} && set -ex; {remote_set_id_cmd};"
 
     transfer_and_exec_cmd = f"cat {local_config['tower_path']} | ssh {ssh_opts} {ssh_host_str} \"{chained_remote_cmds}\""
 
@@ -353,11 +340,10 @@ def print_summary(timings):
     """Prints a summary of the timing for each step of the failover."""
     print_header("Summary")
     log_msg("INFO", f"(1). Local Identity Change:                 {format_duration(timings.get('local_id_change', 0))}")
-    log_msg("INFO", f"(2). Local Symlink Update:                  {format_duration(timings.get('local_symlink_update', 0))}")
-    log_msg("INFO", f"(3). Tower Transfer & Remote Commands:      {format_duration(timings.get('pipelined_total_duration', 0))}")
-    log_msg("INFO", f"(4). Critical Failover Window (1-3):        {format_duration(timings.get('critical_failover_window', 0))}")
-    log_msg("INFO", f"(5). Verification Phase:                    {format_duration(timings.get('verification', 0))}")
-    log_msg("INFO", f"(6). Total Script Execution Time (1-6):     {format_duration(timings.get('total_duration', 0))}")
+    log_msg("INFO", f"(2). Tower Transfer & Remote Commands:      {format_duration(timings.get('pipelined_total_duration', 0))}")
+    log_msg("INFO", f"(3). Critical Failover Window (1-2):        {format_duration(timings.get('critical_failover_window', 0))}")
+    log_msg("INFO", f"(4). Verification Phase:                    {format_duration(timings.get('verification', 0))}")
+    log_msg("INFO", f"(5). Total Script Execution Time (1-5):     {format_duration(timings.get('total_duration', 0))}")
     log_msg("SUCCESS", "Identity Swap Complete")
 
 
