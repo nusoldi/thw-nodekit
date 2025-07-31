@@ -207,7 +207,7 @@ def get_tower_paths(local_config, remote_config):
         tower_filename = f"tower-1_9-{local_validator_pubkey}.bin"
         
         local_tower_path = os.path.join(local_config['ledger_path'], tower_filename)
-        remote_tower_path = os.path.join(remote_config['tower_path_dir'], tower_filename)
+        remote_tower_path = os.path.join(remote_config['ledger_path'], tower_filename)
 
         # Add these paths to the config dictionaries for later use.
         local_config['tower_path'] = local_tower_path
