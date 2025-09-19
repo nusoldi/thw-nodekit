@@ -17,7 +17,13 @@ def clone_repo(repo_url: str, target_dir: str, branch: Optional[str] = None, rec
         branch: The specific branch or tag to clone. If None, clones the default branch.
         recurse_submodules: If True, initializes and updates submodules recursively.
     """
-    command = ["git", "clone"]
+    # Use a config override to force SSH for submodules if the main repo is SSH.
+    # This is a workaround to enable git to work with private firedancer-agave-mod submodules.
+    command = ["git"]
+    if repo_url.startswith("git@"):
+        command.extend(["-c", "url.git@github.com:.insteadOf=https://github.com/"])
+
+    command.append("clone")
     if branch:
         command.extend(["--branch", branch])
     if recurse_submodules:
