@@ -20,7 +20,7 @@ THW-NodeKit provides a unified command-line interface (CLI) with various functio
     *   Control over build threads/jobs to ensure new releases can safely be installed on live/voting nodes
 *   **`Toolkit` Details**:
     *   Real-time TVC tracker `tvc` for any validator on mainnet (um) or testnet (ut).
-    *   Agave identity swap command `failover` for robust and efficient validator failovers
+    *   Validator identity swap command `failover` for robust and efficient validator failovers
     *   Snapshot downloads via the Avorio network `snap-avorio`  or the Snapshot Finder tool `snap-finder`
     *   Affinity command `affinity` to set the Agave PoH thread to a specific core
     *   Symlink command `symlink` to update the active_release based on the client/version (TAG)

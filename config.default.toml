@@ -86,52 +86,65 @@ compare_ranks_ut = [1,5,10,25,50,75,100,150,200,250,300,350,400,450,500,600,700,
 # cluster should be "mainnet" or "testnet"
 # Prerequisites and assumptions:
 # 1. SSH Access: Passwordless SSH key-based authentication must be configured with keys stored in ssh_key_path.
-# 2. Correct Paths: All file paths defined in 'config.default.toml' must be accurate and defined as absolute/full paths
+# 2. Correct Paths: All file paths defined in 'config.default.toml' must be accurate and defined as absolute/full paths.
 # 3. Correct User: This script must be run as the user that owns the validator process.
-# 4. Agave/Solana CLI: Binaries must be in the PATH defined in the config.
-# 5. Execution Location: The script MUST be executed on the currently LIVE/VOTING node.
+# 3. Correct Client: The correct client, either "agave" or "firedancer", must be defined for each node configuration.
+# 5. Agave/Firedancer/Solana CLI: Binaries (solana or fdctl, agave-validator, solana-keygen) must be in the PATH defined in the config.
+# 6. Execution Location: The script MUST be executed on the currently LIVE/VOTING node.
 
 # EXAMPLES:
 [thw-testnet.testnet]
 hostname          = "thw-testnet"
 ip                = "12.34.567.890"
 user              = "sol"
+client            = "firedancer"
 ssh_key_path      = "/home/sol/.ssh/thw-failover-sol"
 solana_path       = "/home/sol/.local/share/solana/install/active_release/bin/"
 ledger_path       = "/mnt/ledger"
 unstaked_keypair  = "/home/sol/junk-identity-keypair.json"
 validator_keypair = "/home/sol/validator-keypair.json"
 agave_log         = "/home/sol/logs/agave-validator.log"
+fd_log            = "/home/sol/logs/firedancer-validator.log"
+fd_config         = "/home/sol/firedancer-config.toml"
 
 [thw-mainnet.mainnet]
 hostname          = "thw-mainnet"
 ip                = "98.76.543.210"
 user              = "sol"
+client            = "agave"
 ssh_key_path      = "/home/sol/.ssh/thw-failover-sol"
 solana_path       = "/home/sol/.local/share/solana/install/active_release/bin/"
 ledger_path       = "/mnt/ledger"
 unstaked_keypair  = "/home/sol/junk-identity-keypair.json"
 validator_keypair = "/home/sol/validator-keypair.json"
 agave_log         = "/home/sol/logs/agave-validator.log"
+fd_log            = "" 
+fd_config         = ""
 
 [thw-hotspare.testnet]
 hostname          = "thw-hotspare"
 ip                = "69.69.696.969"
 user              = "sol"
+client            = "firedancer"
 ssh_key_path      = "/home/sol/.ssh/thw-failover-sol"
 solana_path       = "/home/sol/.local/share/solana/install/active_release/bin/"
 ledger_path       = "/mnt/ledger/testnet"
 validator_keypair = "/home/sol/testnet/validator-keypair.json"
 unstaked_keypair  = "/home/sol/testnet/junk-identity-keypair.json"
 agave_log         = "/home/sol/logs/testnet/agave-validator.log"
+fd_log            = "/home/sol/logs/testnet/firedancer-validator.log" 
+fd_config         = "/home/sol/testnet/firedancer-config.toml"
 
 [thw-hotspare.mainnet]
 hostname          = "thw-hotspare"
 ip                = "69.69.696.969"
 user              = "sol"
+client            = "agave"
 ssh_key_path      = "/home/sol/.ssh/thw-failover-sol"
 solana_path       = "/home/sol/.local/share/solana/install/active_release/bin/"
 ledger_path       = "/mnt/ledger/mainnet"
 validator_keypair = "/home/sol/mainnet/validator-keypair.json"
 unstaked_keypair  = "/home/sol/mainnet/junk-identity-keypair.json"
 agave_log         = "/home/sol/logs/mainnet/agave-validator.log"
+fd_log            = "" 
+fd_config         = ""

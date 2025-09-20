@@ -11,6 +11,41 @@ from typing import Optional, Dict, Any
 
 from thw_nodekit.config import get_config
 
+# New combined configuration to provide support for both Agave and Firedancer.
+CLIENT_CONFIGS = {
+    "agave": {
+        "validator_binary": "agave-validator",
+        "keygen_binary": "solana-keygen",
+        "log_key": "agave_log",
+        "required_configs": ["ledger_path", "unstaked_keypair", "validator_keypair", "ssh_key_path", "agave_log"],
+        "tower_file_pattern": "tower-1_9-{pubkey}.bin",
+        "commands": {
+            "set_identity": "{validator_binary} --ledger {ledger_path} set-identity {identity_keypair}",
+            "set_identity_require_tower": "{validator_binary} --ledger {ledger_path} set-identity --require-tower {identity_keypair}",
+            "wait_for_restart": "{validator_binary} --ledger {ledger_path} wait-for-restart-window --min-idle-time 2 --skip-new-snapshot-check",
+            "pubkey": "{keygen_binary} pubkey {keypair_path}",
+            "log_grep_identity_set": "grep 'Identity set to' \"{log_path}\" | tail -n 1 || true",
+            "log_grep_identity_changed": "grep 'Identity changed' \"{log_path}\" | tail -n 1 || true",
+        }
+    },
+    "firedancer": {
+        "validator_binary": "fdctl",
+        "keygen_binary": "solana-keygen",
+        "log_key": "fd_log",
+        "required_configs": ["ledger_path", "unstaked_keypair", "validator_keypair", "ssh_key_path", "fd_log", "fd_config"],
+        "tower_file_pattern": "tower-1_9-{pubkey}.bin",
+        "commands": {
+            "set_identity": "{validator_binary} --config {fd_config} set-identity --force {identity_keypair}",
+            "set_identity_require_tower": "{validator_binary} --config {fd_config} set-identity --force --require-tower {identity_keypair}",
+            "wait_for_restart": "echo 'Firedancer client detected, skipping wait-for-restart-window step.'",
+            "pubkey": "{keygen_binary} pubkey {keypair_path}",
+            "log_grep_identity_set": "grep 'Validator identity key switched to' \"{log_path}\" | tail -n 1 || true",
+            "log_grep_identity_changed": "grep 'Validator identity key switched to' \"{log_path}\" | tail -n 1 || true",
+        }
+    }
+}
+
+
 # --- ANSI Color Codes ---
 # Preserving the exact codes from the original script for visual consistency.
 C_BLUE = "\033[94m"
@@ -42,7 +77,7 @@ def print_header(title):
     """Prints a consistent, formatted header."""
     separator = "-" * 120
     print(f"{C_CYAN}{separator}{C_NC}")
-    print(f"{C_GREEN}THW-NodeKit {C_CYAN}| Agave Identity Swap (Failover):{C_NC} {C_YELLOW}{title}{C_NC}")
+    print(f"{C_GREEN}THW-NodeKit {C_CYAN}| Validator Identity Swap (Failover):{C_NC} {C_YELLOW}{title}{C_NC}")
     print(f"{C_CYAN}{separator}{C_NC}")
 
 
@@ -71,6 +106,17 @@ def load_configuration(from_host, to_host, cluster, config_path):
     except KeyError:
         log_msg("ERROR", f"Configuration error. Could not find host or cluster in config.")
         log_msg("ERROR", f"Please ensure an entry for '[{from_host}.{cluster}]' and '[{to_host}.{cluster}]' exists.")
+        return None
+
+    # Determine client type, defaulting to 'agave' for backward compatibility
+    local_conf['client'] = local_conf.get('client', 'agave').lower()
+    remote_conf['client'] = remote_conf.get('client', 'agave').lower()
+
+    if local_conf['client'] not in CLIENT_CONFIGS:
+        log_msg("ERROR", f"Unsupported client type '{local_conf['client']}' for host {from_host}.")
+        return None
+    if remote_conf['client'] not in CLIENT_CONFIGS:
+        log_msg("ERROR", f"Unsupported client type '{remote_conf['client']}' for host {to_host}.")
         return None
 
     config = {
@@ -116,6 +162,11 @@ def run_pre_flight_checks(from_host, local_config, remote_config):
     print_header("Pre-Flight Checks")
     errors = False
 
+    local_client = local_config['client']
+    remote_client = remote_config['client']
+    local_client_cfg = CLIENT_CONFIGS[local_client]
+    remote_client_cfg = CLIENT_CONFIGS[remote_client]
+
     ssh_opts = f"-i {local_config['ssh_key_path']} -o ConnectTimeout=5 -o 'ControlMaster=auto' -o 'ControlPath=/tmp/ssh-%r@%h:%p' -o 'ControlPersist=yes'"
     ssh_host_str = f"{remote_config['user']}@{remote_config['ip']}"
     ssh_cmd_prefix = f"ssh {ssh_opts} {ssh_host_str}"
@@ -130,15 +181,27 @@ def run_pre_flight_checks(from_host, local_config, remote_config):
     log_msg("SUCCESS", "OK: Script is running on the correct source host.")
 
     # 2. Local File/Binary Checks
-    log_msg("INFO", f"--- Verifying local node ({C_BLUE}{from_host}{C_NC}) ---")
-    local_checks = {
-        f"Local ledger path ({local_config['ledger_path']})": (os.path.isdir, local_config['ledger_path']),
-        f"Local unstaked keypair ({local_config['unstaked_keypair']})": (os.path.isfile, local_config['unstaked_keypair']),
-        f"Local validator keypair ({local_config['validator_keypair']})": (os.path.isfile, local_config['validator_keypair']),
-        f"SSH key ({local_config['ssh_key_path']})": (os.path.isfile, local_config['ssh_key_path']),
-        "agave-validator executable": (os.access, os.path.join(local_config['solana_path'], "agave-validator"), os.X_OK),
-        "solana-keygen executable": (os.access, os.path.join(local_config['solana_path'], "solana-keygen"), os.X_OK),
-    }
+    log_msg("INFO", f"--- Verifying local node ({C_BLUE}{from_host}{C_NC} | Client: {C_RED if local_client == 'firedancer' else C_GREEN}{local_client}{C_NC}) ---")
+    local_checks = {}
+    # Add client-specific file checks from its required_configs list
+    for key in local_client_cfg['required_configs']:
+        path = local_config.get(key)
+        if not path:
+            log_msg("ERROR", f"FAILED: Missing required local config parameter '{key}' for client '{local_client}'")
+            errors = True
+            continue
+        # Use isdir for ledger_path, isfile for all others
+        check_func = os.path.isdir if key == 'ledger_path' else os.path.isfile
+        local_checks[f"Local {key} ({path})"] = (check_func, path)
+
+    # Add client-specific binary checks
+    local_validator_bin = os.path.join(local_config['solana_path'], local_client_cfg['validator_binary'])
+    local_keygen_bin = os.path.join(local_config['solana_path'], local_client_cfg['keygen_binary'])
+    local_checks[f"{local_client_cfg['validator_binary']} executable"] = (os.access, local_validator_bin, os.X_OK)
+    local_checks[f"{local_client_cfg['keygen_binary']} executable"] = (os.access, local_keygen_bin, os.X_OK)
+    local_agave_validator_bin = os.path.join(local_config['solana_path'], 'agave-validator')
+    local_checks["agave-validator executable (for verification)"] = (os.access, local_agave_validator_bin, os.X_OK)
+
     for desc, check in local_checks.items():
         log_msg("INFO", f"Checking: {desc}...")
         try:
@@ -151,13 +214,27 @@ def run_pre_flight_checks(from_host, local_config, remote_config):
             errors = True
 
     # 3. Remote File/Binary Checks
-    log_msg("INFO", f"--- Verifying remote node ({C_GREEN}{remote_config['hostname']}{C_NC}) ---")
-    remote_checks = {
-        f"Remote ledger path ({remote_config['ledger_path']})": f"[ -d '{remote_config['ledger_path']}' ]",
-        f"Remote validator keypair ({remote_config['validator_keypair']})": f"[ -f '{remote_config['validator_keypair']}' ]",
-        "Remote agave-validator executable": f"[ -x '{os.path.join(remote_config['solana_path'], 'agave-validator')}' ]",
-        "Remote solana-keygen executable": f"[ -x '{os.path.join(remote_config['solana_path'], 'solana-keygen')}' ]",
-    }
+    log_msg("INFO", f"--- Verifying remote node ({C_GREEN}{remote_config['hostname']}{C_NC} | Client: {C_RED if remote_client == 'firedancer' else C_GREEN}{remote_client}{C_NC}) ---")
+    remote_checks = {}
+    # Add client-specific remote file checks
+    for key in remote_client_cfg['required_configs']:
+        path = remote_config.get(key)
+        if not path:
+            log_msg("ERROR", f"FAILED: Missing required remote config parameter '{key}' for client '{remote_client}'")
+            errors = True
+            continue
+        # Use -d for ledger_path, -f for all others
+        check_op = '-d' if key == 'ledger_path' else '-f'
+        remote_checks[f"Remote {key} ({path})"] = f"[ {check_op} '{path}' ]"
+
+    # Add client-specific remote binary checks
+    remote_validator_bin = os.path.join(remote_config['solana_path'], remote_client_cfg['validator_binary'])
+    remote_keygen_bin = os.path.join(remote_config['solana_path'], remote_client_cfg['keygen_binary'])
+    remote_checks[f"Remote {remote_client_cfg['validator_binary']} executable"] = f"[ -x '{remote_validator_bin}' ]"
+    remote_checks[f"Remote {remote_client_cfg['keygen_binary']} executable"] = f"[ -x '{remote_keygen_bin}' ]"
+    remote_agave_validator_bin = os.path.join(remote_config['solana_path'], 'agave-validator')
+    remote_checks["Remote agave-validator executable (for verification)"] = f"[ -x '{remote_agave_validator_bin}' ]"
+
     for desc, cmd in remote_checks.items():
         log_msg("INFO", f"Checking: {desc}...")
         full_ssh_cmd = f"{ssh_cmd_prefix} \"{cmd}\""
@@ -174,15 +251,18 @@ def run_pre_flight_checks(from_host, local_config, remote_config):
 
     # 4. Remote Tower Check
     log_msg("INFO", "Checking: Existing tower on remote node...")
-    pubkey_cmd = f"{os.path.join(remote_config['solana_path'], 'solana-keygen')} pubkey {remote_config['validator_keypair']}"
+    keygen_cmd_str = remote_client_cfg['commands']['pubkey'].format(
+        keygen_binary=os.path.join(remote_config['solana_path'], remote_client_cfg['keygen_binary']),
+        keypair_path=remote_config['validator_keypair']
+    )
     
-    remote_pubkey_result = subprocess.run(f"{ssh_cmd_prefix} \"{pubkey_cmd}\"", shell=True, capture_output=True, text=True)
+    remote_pubkey_result = subprocess.run(f"{ssh_cmd_prefix} \"{keygen_cmd_str}\"", shell=True, capture_output=True, text=True)
     if remote_pubkey_result.returncode != 0:
         log_msg("ERROR", f"Could not get remote validator pubkey: {remote_pubkey_result.stderr}")
         sys.exit(1)
         
     remote_validator_pubkey = remote_pubkey_result.stdout.strip()
-    remote_tower_filename = f"tower-1_9-{remote_validator_pubkey}.bin"
+    remote_tower_filename = remote_client_cfg['tower_file_pattern'].format(pubkey=remote_validator_pubkey)
     remote_tower_check_path = os.path.join(remote_config['ledger_path'], remote_tower_filename)
     
     tower_check_cmd = f"[ -f '{remote_tower_check_path}' ]"
@@ -190,21 +270,31 @@ def run_pre_flight_checks(from_host, local_config, remote_config):
     result = subprocess.run(full_ssh_tower_check_cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
     if result.returncode == 0:
-        log_msg("SUCCESS", "OK: Existing tower found on remote. Will use --require-tower.")
-        remote_config['require_tower_flag'] = "--require-tower"
+        log_msg("SUCCESS", "OK: Existing tower found on remote. Will use --require-tower (or equivalent).")
+        remote_config['require_tower'] = True
     else:
-        log_msg("WARN", "No existing tower for main identity found on remote node. A new tower will be initialized.")
-        remote_config['require_tower_flag'] = ""
+        log_msg("WARN", "No existing tower for main identity found on remote node. A new one will be initialized.")
+        remote_config['require_tower'] = False
 
 
 def get_tower_paths(local_config, remote_config):
     """Determines the full local and remote paths for the tower file."""
-    # We only need the local validator's pubkey to determine the tower filename.
-    pubkey_cmd = [os.path.join(local_config['solana_path'], 'solana-keygen'), 'pubkey', local_config['validator_keypair']]
+    local_client_cfg = CLIENT_CONFIGS[local_config['client']]
+    remote_client_cfg = CLIENT_CONFIGS[remote_config['client']]
+
+    # The keypair format is standard, so solana-keygen should work for both clients.
+    pubkey_cmd_str = local_client_cfg['commands']['pubkey'].format(
+        keygen_binary=os.path.join(local_config['solana_path'], local_client_cfg['keygen_binary']),
+        keypair_path=local_config['validator_keypair']
+    )
+    pubkey_cmd = pubkey_cmd_str.split()
+
     try:
         # We need to run this locally to get the pubkey for the filename.
-        local_validator_pubkey = run_shell_command(pubkey_cmd, "", hide_output=True).stdout.strip()
-        tower_filename = f"tower-1_9-{local_validator_pubkey}.bin"
+        local_validator_pubkey = run_shell_command(pubkey_cmd, "", hide_output=True, capture_stdout=True).stdout.strip()
+        
+        # Tower filename is identical for both clients.
+        tower_filename = local_client_cfg['tower_file_pattern'].format(pubkey=local_validator_pubkey)
         
         local_tower_path = os.path.join(local_config['ledger_path'], tower_filename)
         remote_tower_path = os.path.join(remote_config['ledger_path'], tower_filename)
@@ -219,16 +309,36 @@ def get_tower_paths(local_config, remote_config):
 
 def display_confirmation_prompt(from_host, to_host, cluster, local_config, remote_config):
     """Displays the planned actions and asks for user confirmation."""
+    local_client_cfg = CLIENT_CONFIGS[local_config['client']]
+    remote_client_cfg = CLIENT_CONFIGS[remote_config['client']]
+
+    # --- Local Command Formatting ---
+    local_set_identity_cmd_str = local_client_cfg['commands']['set_identity'].format(
+        validator_binary=os.path.join(local_config['solana_path'], local_client_cfg['validator_binary']),
+        ledger_path=local_config['ledger_path'],
+        identity_keypair=local_config['unstaked_keypair'],
+        fd_config=local_config.get('fd_config', '') # Safely get fd_config, will be ignored by agave's format string
+    )
+
+    # --- Remote Command Formatting ---
+    remote_cmd_key = 'set_identity_require_tower' if remote_config.get('require_tower') else 'set_identity'
+    remote_set_identity_cmd_str = remote_client_cfg['commands'][remote_cmd_key].format(
+        validator_binary=os.path.join(remote_config['solana_path'], remote_client_cfg['validator_binary']),
+        ledger_path=remote_config['ledger_path'],
+        identity_keypair=remote_config['validator_keypair'],
+        fd_config=remote_config.get('fd_config', '') # Safely get fd_config, will be ignored by agave's format string
+    )
+
     print_header("Confirmation")
-    print(f"FROM (Local/Active):   {C_BLUE}{from_host}{C_NC}")
-    print(f"TO (Remote/Inactive):  {C_GREEN}{to_host}{C_NC}")
+    print(f"FROM (Local/Active):   {C_BLUE}{from_host}{C_NC} (Client: {C_RED if local_config['client'] == 'firedancer' else C_GREEN}{local_config['client']}{C_NC})")
+    print(f"TO (Remote/Inactive):  {C_GREEN}{to_host}{C_NC} (Client: {C_RED if remote_config['client'] == 'firedancer' else C_GREEN}{remote_config['client']}{C_NC})")
     print(f"CLUSTER:               {C_YELLOW}{cluster}{C_NC}")
 
     print(C_CYAN + "------------------------------------------------------------------------------------------------------------------------")
     print(f"{C_CYAN}Actions on LOCAL node {C_BLUE}({from_host}){C_NC}:")
     print(C_CYAN + "------------------------------------------------------------------------------------------------------------------------")
     print(f"{C_CYAN}(1). Change Identity to {C_BLUE}JUNK{C_NC}{C_CYAN}:{C_NC}")
-    print(f"---> {local_config['solana_path']}agave-validator --ledger {local_config['ledger_path']} set-identity {local_config['unstaked_keypair']}")
+    print(f"---> {local_set_identity_cmd_str}")
     print(f"{C_CYAN}(2). Transfer Tower File:{C_NC}")
     print(f"---> cat {local_config.get('tower_path', '[local_tower_path]')} | ssh ... | dd of={remote_config.get('tower_path', '[remote_tower_path]')}")
 
@@ -236,7 +346,7 @@ def display_confirmation_prompt(from_host, to_host, cluster, local_config, remot
     print(f"{C_CYAN}Actions on REMOTE node {C_GREEN}({to_host}){C_NC}:")
     print(C_CYAN + "------------------------------------------------------------------------------------------------------------------------")
     print(f"{C_CYAN}(1). Change Identity to {C_GREEN}VALIDATOR{C_NC}{C_CYAN}:{C_NC}")
-    print(f"---> {remote_config['solana_path']}agave-validator --ledger {remote_config['ledger_path']} set-identity {remote_config['require_tower_flag']} {remote_config['validator_keypair']}")
+    print(f"---> {remote_set_identity_cmd_str}")
     print(C_CYAN + "------------------------------------------------------------------------------------------------------------------------")
     
     try:
@@ -256,20 +366,35 @@ def execute_failover(from_host, to_host, local_config, remote_config):
     print_header("Execution")
     timings = {}
 
+    local_client = local_config['client']
+    local_client_cfg = CLIENT_CONFIGS[local_client]
+    remote_client_cfg = CLIENT_CONFIGS[remote_config['client']]
+
     # --- Start Failover ---
     overall_start_time = time.monotonic()
 
-    # 1. Wait for restart window
-    cmd_list = [os.path.join(local_config['solana_path'], 'agave-validator'), '--ledger', local_config['ledger_path'], 'wait-for-restart-window', '--min-idle-time', '2', '--skip-new-snapshot-check']
-    run_shell_command(cmd_list, "Waiting for restart window...")
+    # 1. Wait for restart window (only if local client is Agave)
+    if local_client == 'agave':
+        wait_cmd_str = local_client_cfg['commands']['wait_for_restart'].format(
+            validator_binary=os.path.join(local_config['solana_path'], local_client_cfg['validator_binary']),
+            ledger_path=local_config['ledger_path']
+        )
+        run_shell_command(wait_cmd_str.split(), "Waiting for restart window (Agave specific)...")
+    else:
+        log_msg("INFO", "Skipping wait-for-restart-window as local client is not Agave.")
 
     # Record start of critical failover window HERE, before any identity changes.
     failover_start_time = time.monotonic()
 
     # 2. Set local identity to junk
     local_id_start = time.monotonic()
-    cmd_list = [os.path.join(local_config['solana_path'], 'agave-validator'), '--ledger', local_config['ledger_path'], 'set-identity', local_config['unstaked_keypair']]
-    run_shell_command(cmd_list, f"Changing identity on local node ({C_BLUE}{from_host}{C_NC})...")
+    local_set_identity_cmd_str = local_client_cfg['commands']['set_identity'].format(
+        validator_binary=os.path.join(local_config['solana_path'], local_client_cfg['validator_binary']),
+        ledger_path=local_config['ledger_path'],
+        identity_keypair=local_config['unstaked_keypair'],
+        fd_config=local_config.get('fd_config', '')
+    )
+    run_shell_command(local_set_identity_cmd_str.split(), f"Changing identity on local node ({C_BLUE}{from_host}{C_NC})...")
     timings['local_id_change'] = time.monotonic() - local_id_start
 
     # 4. OPTIMIZATION: Combine tower transfer and remote commands into a single, pipelined SSH execution.
@@ -278,7 +403,13 @@ def execute_failover(from_host, to_host, local_config, remote_config):
 
     pipelined_total_start = time.monotonic()
 
-    remote_set_id_cmd = f"{os.path.join(remote_config['solana_path'], 'agave-validator')} --ledger {remote_config['ledger_path']} set-identity {remote_config['require_tower_flag']} {remote_config['validator_keypair']}"
+    remote_cmd_key = 'set_identity_require_tower' if remote_config.get('require_tower') else 'set_identity'
+    remote_set_id_cmd = remote_client_cfg['commands'][remote_cmd_key].format(
+        validator_binary=os.path.join(remote_config['solana_path'], remote_client_cfg['validator_binary']),
+        ledger_path=remote_config['ledger_path'],
+        identity_keypair=remote_config['validator_keypair'],
+        fd_config=remote_config.get('fd_config', '')
+    )
 
     # Chain the commands. `dd` reads from stdin until EOF, then the shell executes the rest via `&&`.
     # `set -ex` ensures that the script will exit immediately if any command fails.
@@ -304,6 +435,11 @@ def run_verification(from_host, to_host, local_config, remote_config):
     print_header("Verification")
     verification_start_time = time.monotonic()
 
+    local_client_cfg = CLIENT_CONFIGS[local_config['client']]
+    remote_client_cfg = CLIENT_CONFIGS[remote_config['client']]
+    local_log_path = local_config.get(local_client_cfg['log_key'], '/dev/null')
+    remote_log_path = remote_config.get(remote_client_cfg['log_key'], '/dev/null')
+
     # Common SSH options for verification commands
     ssh_opts = f"-i {local_config['ssh_key_path']} -o 'ControlMaster=auto' -o 'ControlPath=/tmp/ssh-%r@%h:%p' -o 'ControlPersist=yes'"
     ssh_host_str = f"{remote_config['user']}@{remote_config['ip']}"
@@ -311,25 +447,27 @@ def run_verification(from_host, to_host, local_config, remote_config):
     # Local Verification
     log_msg("INFO", f"--- Verifying identity on LOCAL node ({C_BLUE}{from_host}{C_NC}) ---")
     
-    local_grep_cmd1 = f"grep 'Identity set to' \"{local_config['agave_log']}\" | tail -n 1 || true"
-    run_shell_command(local_grep_cmd1,f"Searching for last 'Identity set to' in {local_config['agave_log']}...", is_shell_cmd=True)
+    local_grep_cmd1 = local_client_cfg['commands']['log_grep_identity_set'].format(log_path=local_log_path)
+    run_shell_command(local_grep_cmd1,f"Searching for last identity set message in {local_log_path}...", is_shell_cmd=True)
     
-    local_grep_cmd2 = f"grep 'Identity changed' \"{local_config['agave_log']}\" | tail -n 1 || true"
-    run_shell_command(local_grep_cmd2,f"Searching for last 'Identity changed' in {local_config['agave_log']}...", is_shell_cmd=True)
+    local_grep_cmd2 = local_client_cfg['commands']['log_grep_identity_changed'].format(log_path=local_log_path)
+    run_shell_command(local_grep_cmd2,f"Searching for last identity changed message in {local_log_path}...", is_shell_cmd=True)
     
-    local_verify_cmd_str = f"{os.path.join(local_config['solana_path'], 'agave-validator')} --ledger {local_config['ledger_path']} contact-info | grep 'Identity:'"
+    agave_validator_binary = os.path.join(local_config['solana_path'], 'agave-validator')
+    local_verify_cmd_str = f"{agave_validator_binary} --ledger {local_config['ledger_path']} contact-info | grep 'Identity:'"
     run_shell_command(local_verify_cmd_str, "Querying local validator contact info...", is_shell_cmd=True)
     
     # Remote Verification
     log_msg("INFO", f"--- Verifying identity on REMOTE node ({C_GREEN}{to_host}{C_NC}) ---")
     
-    remote_grep_cmd1 = f"ssh {ssh_opts} {ssh_host_str} \"grep 'Identity set to' '{remote_config['agave_log']}' | tail -n 1 || true\""
-    run_shell_command(remote_grep_cmd1,f"Searching for last 'Identity set to' in {remote_config['agave_log']}...", is_shell_cmd=True)
+    remote_grep_cmd1 = f"ssh {ssh_opts} {ssh_host_str} \"{remote_client_cfg['commands']['log_grep_identity_set'].format(log_path=remote_log_path)}\""
+    run_shell_command(remote_grep_cmd1,f"Searching for last identity set message in {remote_log_path}...", is_shell_cmd=True)
     
-    remote_grep_cmd2 = f"ssh {ssh_opts} {ssh_host_str} \"grep 'Identity changed' '{remote_config['agave_log']}' | tail -n 1 || true\""
-    run_shell_command(remote_grep_cmd2,f"Searching for last 'Identity changed' in {remote_config['agave_log']}...", is_shell_cmd=True)
+    remote_grep_cmd2 = f"ssh {ssh_opts} {ssh_host_str} \"{remote_client_cfg['commands']['log_grep_identity_changed'].format(log_path=remote_log_path)}\""
+    run_shell_command(remote_grep_cmd2,f"Searching for last identity changed message in {remote_log_path}...", is_shell_cmd=True)
     
-    remote_verify_cmd_str = f"{os.path.join(remote_config['solana_path'], 'agave-validator')} --ledger {remote_config['ledger_path']} contact-info | grep 'Identity:'"
+    remote_agave_validator_binary = os.path.join(remote_config['solana_path'], 'agave-validator')
+    remote_verify_cmd_str = f"{remote_agave_validator_binary} --ledger {remote_config['ledger_path']} contact-info | grep 'Identity:'"
     full_remote_verify_cmd = f"ssh {ssh_opts} {ssh_host_str} \"{remote_verify_cmd_str}\""
     run_shell_command(full_remote_verify_cmd, "Querying remote validator contact info...", is_shell_cmd=True)
 
