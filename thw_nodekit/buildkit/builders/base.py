@@ -64,6 +64,45 @@ class BaseBuilder(abc.ABC):
         log_level = logging.INFO if success else logging.ERROR
         logger.log(log_level, f"--- Build Step {step_number} {status} ---")
 
+    def _patch_cargo_install_all_for_sbf_duplicate(self, script_path: str) -> None:
+        """Patch Agave/Jito installers that install cargo-test-sbf twice.
+
+        Agave v4.0.0's installer separately installs cargo-build-sbf and
+        cargo-test-sbf. Newer cargo-build-sbf crates already provide both
+        binaries, which makes the second cargo install fail.
+        """
+        marker = "cargo-test-sbf already installed by cargo-build-sbf"
+        old = '''  # shellcheck disable=SC2086
+  "$cargo" $maybeRustVersion install --locked cargo-build-sbf --root "$installDir" $maybeCargoBuildSbfVersionArg
+  # shellcheck disable=SC2086
+  "$cargo" $maybeRustVersion install --locked cargo-test-sbf --root "$installDir" $maybeCargoTestSbfVersionArg
+'''
+        new = '''  # shellcheck disable=SC2086
+  "$cargo" $maybeRustVersion install --locked cargo-build-sbf --root "$installDir" $maybeCargoBuildSbfVersionArg
+  if [[ ! -x "$installDir/bin/cargo-test-sbf" ]]; then
+    # shellcheck disable=SC2086
+    "$cargo" $maybeRustVersion install --locked cargo-test-sbf --root "$installDir" $maybeCargoTestSbfVersionArg
+  else
+    echo "cargo-test-sbf already installed by cargo-build-sbf; skipping separate install"
+  fi
+'''
+
+        with open(script_path, "r", encoding="utf-8") as file:
+            contents = file.read()
+
+        if marker in contents:
+            logger.info("cargo-install-all.sh already has the cargo-test-sbf compatibility patch.")
+            return
+
+        if old not in contents:
+            logger.info("cargo-install-all.sh does not need the cargo-test-sbf compatibility patch.")
+            return
+
+        with open(script_path, "w", encoding="utf-8") as file:
+            file.write(contents.replace(old, new, 1))
+
+        logger.info("Applied cargo-test-sbf compatibility patch to cargo-install-all.sh.")
+
     def _user_confirmation(self) -> bool:
         """Display build details and prompt user for confirmation with aligned output."""
         # Determine max label length for alignment

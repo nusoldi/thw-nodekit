@@ -39,6 +39,8 @@ class AgaveBuilder(BaseBuilder):
         script_path = os.path.join(self.source_dir, "scripts", "cargo-install-all.sh")
         if not os.path.exists(script_path):
             raise FileNotFoundError(f"Installation script not found: {script_path}")
+
+        self._patch_cargo_install_all_for_sbf_duplicate(script_path)
             
         # Get commit hash for CI_COMMIT env var, mimicking the script
         try:
