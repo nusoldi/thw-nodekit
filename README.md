@@ -297,7 +297,7 @@ Creates or updates the `active_release` symlink for a specified Solana client ve
 
 #### `failover`: Perform Validator Identity Swap (Failover)
 
-Orchestrates a nearly instantaneous identity swap (failover) between two validator nodes: an active (local) node and an inactive 'hotspare' (remote) node. This command automates the process of changing identities, transferring the tower file, and updating symlinks on both nodes to ensure a seamless transition.
+Orchestrates a nearly instantaneous identity swap (failover) between two validator nodes: an active (local) node and an inactive 'hotspare' (remote) node. This command automates the process of changing identities and transferring the vote history file (Alpenglow) to ensure a seamless transition.
 
 *Note: This command is a powerful tool that performs significant changes on both nodes. It is critical to have your `config.local.toml` file correctly configured for both the active (`from_host`) and inactive (`to_host`) nodes before execution. The script performs extensive pre-flight checks to validate configurations and paths on both machines before prompting for final confirmation.*
 

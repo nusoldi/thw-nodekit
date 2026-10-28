@@ -18,10 +18,11 @@ CLIENT_CONFIGS = {
         "keygen_binary": "solana-keygen",
         "log_key": "agave_log",
         "required_configs": ["ledger_path", "unstaked_keypair", "validator_keypair", "ssh_key_path", "agave_log"],
-        "tower_file_pattern": "tower-1_9-{pubkey}.bin",
+        "vote_history_file_pattern": "vote_history-{pubkey}.bin",
         "commands": {
+            # With Alpenglow, set-identity refuses to switch to the staked identity unless its vote history file is present.
             "set_identity": "{validator_binary} --ledger {ledger_path} set-identity {identity_keypair}",
-            "set_identity_require_tower": "{validator_binary} --ledger {ledger_path} set-identity --require-tower {identity_keypair}",
+            "set_identity_no_vote_history": "{validator_binary} --ledger {ledger_path} set-identity --do-not-require-vote-history {identity_keypair}",
             "wait_for_restart": "{validator_binary} --ledger {ledger_path} wait-for-restart-window --min-idle-time 2 --skip-new-snapshot-check",
             "pubkey": "{keygen_binary} pubkey {keypair_path}",
             "log_grep_identity_set": "grep 'Identity set to' \"{log_path}\" | tail -n 1 || true",
@@ -33,10 +34,10 @@ CLIENT_CONFIGS = {
         "keygen_binary": "solana-keygen",
         "log_key": "fd_log",
         "required_configs": ["ledger_path", "unstaked_keypair", "validator_keypair", "ssh_key_path", "fd_log", "fd_config"],
-        "tower_file_pattern": "tower-1_9-{pubkey}.bin",
+        "vote_history_file_pattern": "vote_history-{pubkey}.bin",
         "commands": {
             "set_identity": "{validator_binary} --config {fd_config} set-identity --force {identity_keypair}",
-            "set_identity_require_tower": "{validator_binary} --config {fd_config} set-identity --force --require-tower {identity_keypair}",
+            "set_identity_no_vote_history": "{validator_binary} --config {fd_config} set-identity --force {identity_keypair}",
             "wait_for_restart": "echo 'Firedancer client detected, skipping wait-for-restart-window step.'",
             "pubkey": "{keygen_binary} pubkey {keypair_path}",
             "log_grep_identity_set": "grep 'Validator identity key switched to' \"{log_path}\" | tail -n 1 || true",
@@ -249,36 +250,32 @@ def run_pre_flight_checks(from_host, local_config, remote_config):
         log_msg("ERROR", "Pre-flight checks failed. Please review the errors above. Aborting.")
         sys.exit(1)
 
-    # 4. Remote Tower Check
-    log_msg("INFO", "Checking: Existing tower on remote node...")
-    keygen_cmd_str = remote_client_cfg['commands']['pubkey'].format(
-        keygen_binary=os.path.join(remote_config['solana_path'], remote_client_cfg['keygen_binary']),
-        keypair_path=remote_config['validator_keypair']
-    )
-    
-    remote_pubkey_result = subprocess.run(f"{ssh_cmd_prefix} \"{keygen_cmd_str}\"", shell=True, capture_output=True, text=True)
-    if remote_pubkey_result.returncode != 0:
-        log_msg("ERROR", f"Could not get remote validator pubkey: {remote_pubkey_result.stderr}")
+    # 4. Local Identity Check
+    log_msg("INFO", f"Checking: Local node is running the staked identity ({local_config['validator_pubkey']})...")
+    contact_info_result = subprocess.run([local_agave_validator_bin, '--ledger', local_config['ledger_path'], 'contact-info'], capture_output=True, text=True)
+    running_identity = next((line.split(':', 1)[1].strip() for line in contact_info_result.stdout.splitlines() if line.startswith('Identity:')), None)
+    if contact_info_result.returncode != 0 or not running_identity:
+        log_msg("ERROR", f"FAILED: Could not query local validator identity: {contact_info_result.stderr.strip()}")
         sys.exit(1)
-        
-    remote_validator_pubkey = remote_pubkey_result.stdout.strip()
-    remote_tower_filename = remote_client_cfg['tower_file_pattern'].format(pubkey=remote_validator_pubkey)
-    remote_tower_check_path = os.path.join(remote_config['ledger_path'], remote_tower_filename)
-    
-    tower_check_cmd = f"[ -f '{remote_tower_check_path}' ]"
-    full_ssh_tower_check_cmd = f"{ssh_cmd_prefix} \"{tower_check_cmd}\""
-    result = subprocess.run(full_ssh_tower_check_cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    if running_identity != local_config['validator_pubkey']:
+        log_msg("ERROR", f"FAILED: Local node is running as {running_identity}, not the staked identity {local_config['validator_pubkey']}.")
+        log_msg("ERROR", "This script must be run on the currently LIVE/VOTING node. Aborting.")
+        sys.exit(1)
+    log_msg("SUCCESS", "OK: Local node is running the staked identity.")
 
-    if result.returncode == 0:
-        log_msg("SUCCESS", "OK: Existing tower found on remote. Will use --require-tower (or equivalent).")
-        remote_config['require_tower'] = True
+    # 5. Local Vote History Check
+    log_msg("INFO", "Checking: Vote history file on local node...")
+    if os.path.isfile(local_config['vote_history_path']):
+        log_msg("SUCCESS", f"OK: Vote history file found ({local_config['vote_history_path']}).")
+        remote_config['require_vote_history'] = True
     else:
-        log_msg("WARN", "No existing tower for main identity found on remote node. A new one will be initialized.")
-        remote_config['require_tower'] = False
+        log_msg("WARN", f"No vote history file found on local node ({local_config['vote_history_path']}).")
+        log_msg("WARN", "The remote node will take the staked identity WITHOUT vote history. Review the warning before confirming.")
+        remote_config['require_vote_history'] = False
 
 
-def get_tower_paths(local_config, remote_config):
-    """Determines the full local and remote paths for the tower file."""
+def get_vote_history_paths(local_config, remote_config):
+    """Determines the full local and remote paths for the vote history file."""
     local_client_cfg = CLIENT_CONFIGS[local_config['client']]
     remote_client_cfg = CLIENT_CONFIGS[remote_config['client']]
 
@@ -293,17 +290,18 @@ def get_tower_paths(local_config, remote_config):
         # We need to run this locally to get the pubkey for the filename.
         local_validator_pubkey = run_shell_command(pubkey_cmd, "", hide_output=True, capture_stdout=True).stdout.strip()
         
-        # Tower filename is identical for both clients.
-        tower_filename = local_client_cfg['tower_file_pattern'].format(pubkey=local_validator_pubkey)
+        # Vote history filename is identical for both clients.
+        vote_history_filename = local_client_cfg['vote_history_file_pattern'].format(pubkey=local_validator_pubkey)
         
-        local_tower_path = os.path.join(local_config['ledger_path'], tower_filename)
-        remote_tower_path = os.path.join(remote_config['ledger_path'], tower_filename)
+        local_vote_history_path = os.path.join(local_config['ledger_path'], vote_history_filename)
+        remote_vote_history_path = os.path.join(remote_config['ledger_path'], vote_history_filename)
 
         # Add these paths to the config dictionaries for later use.
-        local_config['tower_path'] = local_tower_path
-        remote_config['tower_path'] = remote_tower_path
+        local_config['validator_pubkey'] = local_validator_pubkey
+        local_config['vote_history_path'] = local_vote_history_path
+        remote_config['vote_history_path'] = remote_vote_history_path
     except Exception as e:
-        log_msg("ERROR", f"Could not determine tower path: {e}")
+        log_msg("ERROR", f"Could not determine vote history path: {e}")
         sys.exit(1)
 
 
@@ -321,7 +319,8 @@ def display_confirmation_prompt(from_host, to_host, cluster, local_config, remot
     )
 
     # --- Remote Command Formatting ---
-    remote_cmd_key = 'set_identity_require_tower' if remote_config.get('require_tower') else 'set_identity'
+    require_vote_history = remote_config.get('require_vote_history', True)
+    remote_cmd_key = 'set_identity' if require_vote_history else 'set_identity_no_vote_history'
     remote_set_identity_cmd_str = remote_client_cfg['commands'][remote_cmd_key].format(
         validator_binary=os.path.join(remote_config['solana_path'], remote_client_cfg['validator_binary']),
         ledger_path=remote_config['ledger_path'],
@@ -339,8 +338,11 @@ def display_confirmation_prompt(from_host, to_host, cluster, local_config, remot
     print(C_CYAN + "------------------------------------------------------------------------------------------------------------------------")
     print(f"{C_CYAN}(1). Change Identity to {C_BLUE}JUNK{C_NC}{C_CYAN}:{C_NC}")
     print(f"---> {local_set_identity_cmd_str}")
-    print(f"{C_CYAN}(2). Transfer Tower File:{C_NC}")
-    print(f"---> cat {local_config.get('tower_path', '[local_tower_path]')} | ssh ... | dd of={remote_config.get('tower_path', '[remote_tower_path]')}")
+    print(f"{C_CYAN}(2). Transfer Vote History File:{C_NC}")
+    if require_vote_history:
+        print(f"---> cat {local_config.get('vote_history_path', '[local_vote_history_path]')} | ssh ... | dd of={remote_config.get('vote_history_path', '[remote_vote_history_path]')}")
+    else:
+        print(f"---> {C_YELLOW}SKIPPED: no vote history file on local node{C_NC}")
 
     print(C_CYAN + "------------------------------------------------------------------------------------------------------------------------")
     print(f"{C_CYAN}Actions on REMOTE node {C_GREEN}({to_host}){C_NC}:")
@@ -348,12 +350,22 @@ def display_confirmation_prompt(from_host, to_host, cluster, local_config, remot
     print(f"{C_CYAN}(1). Change Identity to {C_GREEN}VALIDATOR{C_NC}{C_CYAN}:{C_NC}")
     print(f"---> {remote_set_identity_cmd_str}")
     print(C_CYAN + "------------------------------------------------------------------------------------------------------------------------")
+    if not require_vote_history:
+        print(f"{C_RED}WARNING: No vote history file on the local node. The remote node will take the staked identity WITHOUT vote history.{C_NC}")
+        print(f"{C_RED}Per the Anza failover guide, this is only safe if this identity has never voted under Alpenglow (e.g. a new{C_NC}")
+        print(f"{C_RED}validator), or if the remote node is fully caught up and has finalized slots past this identity's last vote.{C_NC}")
+        print(C_CYAN + "------------------------------------------------------------------------------------------------------------------------")
     
     try:
         # Replicating confirmation from buildkit
-        prompt_text = f"{C_GREEN}Proceed with this failover? (y/N): {C_NC}"
+        if require_vote_history:
+            prompt_text = f"{C_GREEN}Proceed with this failover? (y/N): {C_NC}"
+            expected_confirm = 'y'
+        else:
+            prompt_text = f"{C_RED}Type 'force' to proceed WITHOUT vote history (anything else aborts): {C_NC}"
+            expected_confirm = 'force'
         confirm = input(prompt_text)
-        if confirm.lower() != 'y':
+        if confirm.lower() != expected_confirm:
             log_msg("WARN", "Failover aborted by user.")
             sys.exit(0) # Exit gracefully
     except (EOFError, KeyboardInterrupt):
@@ -397,13 +409,14 @@ def execute_failover(from_host, to_host, local_config, remote_config):
     run_shell_command(local_set_identity_cmd_str.split(), f"Changing identity on local node ({C_BLUE}{from_host}{C_NC})...")
     timings['local_id_change'] = time.monotonic() - local_id_start
 
-    # 4. OPTIMIZATION: Combine tower transfer and remote commands into a single, pipelined SSH execution.
+    # 4. OPTIMIZATION: Combine vote history transfer and remote commands into a single, pipelined SSH execution.
     ssh_opts = f"-i {local_config['ssh_key_path']} -o 'ControlMaster=auto' -o 'ControlPath=/tmp/ssh-%r@%h:%p' -o 'ControlPersist=yes'"
     ssh_host_str = f"{remote_config['user']}@{remote_config['ip']}"
 
     pipelined_total_start = time.monotonic()
 
-    remote_cmd_key = 'set_identity_require_tower' if remote_config.get('require_tower') else 'set_identity'
+    require_vote_history = remote_config.get('require_vote_history', True)
+    remote_cmd_key = 'set_identity' if require_vote_history else 'set_identity_no_vote_history'
     remote_set_id_cmd = remote_client_cfg['commands'][remote_cmd_key].format(
         validator_binary=os.path.join(remote_config['solana_path'], remote_client_cfg['validator_binary']),
         ledger_path=remote_config['ledger_path'],
@@ -411,14 +424,18 @@ def execute_failover(from_host, to_host, local_config, remote_config):
         fd_config=remote_config.get('fd_config', '')
     )
 
-    # Chain the commands. `dd` reads from stdin until EOF, then the shell executes the rest via `&&`.
-    # `set -ex` ensures that the script will exit immediately if any command fails.
-    chained_remote_cmds = f"dd of={remote_config['tower_path']} && set -ex; {remote_set_id_cmd};"
-
-    transfer_and_exec_cmd = f"cat {local_config['tower_path']} | ssh {ssh_opts} {ssh_host_str} \"{chained_remote_cmds}\""
+    if require_vote_history:
+        # Chain the commands. `dd` reads from stdin until EOF, then the shell executes the rest via `&&`.
+        # `set -ex` ensures that the script will exit immediately if any command fails.
+        chained_remote_cmds = f"dd of={remote_config['vote_history_path']} && set -ex; {remote_set_id_cmd};"
+        transfer_and_exec_cmd = f"cat {local_config['vote_history_path']} | ssh {ssh_opts} {ssh_host_str} \"{chained_remote_cmds}\""
+        exec_description = f"Executing vote history transfer and remote commands on {C_GREEN}{to_host}{C_NC}..."
+    else:
+        transfer_and_exec_cmd = f"ssh {ssh_opts} {ssh_host_str} \"set -ex; {remote_set_id_cmd};\""
+        exec_description = f"Executing remote commands on {C_GREEN}{to_host}{C_NC} (no vote history to transfer)..."
 
     # Execute the entire pipeline. We no longer capture stdout.
-    run_shell_command(transfer_and_exec_cmd, f"Executing tower transfer and remote commands on {C_GREEN}{to_host}{C_NC}...", is_shell_cmd=True)
+    run_shell_command(transfer_and_exec_cmd, exec_description, is_shell_cmd=True)
     timings['pipelined_total_duration'] = time.monotonic() - pipelined_total_start
 
     # Record end of critical failover window
@@ -478,7 +495,7 @@ def print_summary(timings):
     """Prints a summary of the timing for each step of the failover."""
     print_header("Summary")
     log_msg("INFO", f"(1). Local Identity Change:                 {format_duration(timings.get('local_id_change', 0))}")
-    log_msg("INFO", f"(2). Tower Transfer & Remote Commands:      {format_duration(timings.get('pipelined_total_duration', 0))}")
+    log_msg("INFO", f"(2). Vote History Transfer & Remote Cmds:   {format_duration(timings.get('pipelined_total_duration', 0))}")
     log_msg("INFO", f"(3). Critical Failover Window (1-2):        {format_duration(timings.get('critical_failover_window', 0))}")
     log_msg("INFO", f"(4). Verification Phase:                    {format_duration(timings.get('verification', 0))}")
     log_msg("INFO", f"(5). Total Script Execution Time (1-5):     {format_duration(timings.get('total_duration', 0))}")
@@ -509,7 +526,7 @@ def manage_failover(from_host: str, to_host: str, cluster: str, config_path: Opt
         run_shell_command(master_cmd_list, "Establishing persistent SSH connection...", hide_output=True)
         master_conn_established = True
 
-        get_tower_paths(config['local'], config['remote'])
+        get_vote_history_paths(config['local'], config['remote'])
         run_pre_flight_checks(from_host=config['from_host'], local_config=config['local'], remote_config=config['remote'])
         display_confirmation_prompt(from_host=config['from_host'], to_host=config['to_host'], cluster=config['cluster'], local_config=config['local'], remote_config=config['remote'])
         
